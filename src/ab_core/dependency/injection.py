@@ -1,4 +1,4 @@
-"""obo_core.dependency.inject
+"""ab_core.dependency.inject
 ================================
 Unified dependency-injection decorator that works for **plain functions**, **coroutines**,
 **generators**, and **async-generators** as well as **classes**.  It mirrors the resource-cleanup
@@ -9,14 +9,14 @@ and reasoning about resources feels completely familiar.
 Bullet-point tour
 -----------------
 * **Single entry-point** - `@inject`.
-* **Single start helper** - `_start_dep` starts a :class:`~obo_core.dependency.Depends` object and
+* **Single start helper** - `_start_dep` starts a :class:`~ab_core.dependency.Depends` object and
 returns *(value, finaliser)*.
 * **Single finaliser runner** - `_finalise_sync` / `_finalise_async` imitate
   `ExitStack` exactly (truthy return ⇒ suppress).
 * **Zero surprises** - a dependency generator that
   *catches* an injected exception swallows it; one that re-raises lets it
   bubble; a dependency can also suppress by returning ``True``.
-* **FastAPI-aware** - because :class:`~obo_core.dependency.Depends` is a
+* **FastAPI-aware** - because :class:`~ab_core.dependency.Depends` is a
   subclass of ``fastapi.Depends`` FastAPI recognises parameters marked
   with it as dependencies, not request-body fields.
 

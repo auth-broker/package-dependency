@@ -4,7 +4,7 @@ import pytest
 from deepdiff import DeepDiff
 from pydantic import BaseModel, Discriminator, TypeAdapter
 
-from obo_core.dependency.pydanticize import pydanticize
+from ab_core.dependency.pydanticize import pydanticize
 
 
 # 1) define our union types

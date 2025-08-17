@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from obo_core.dependency.loaders import ObjectLoaderEnvironment
-from obo_core.dependency.singleton import SingletonRegistry
+from ab_core.dependency.loaders import ObjectLoaderEnvironment
+from ab_core.dependency.singleton import SingletonRegistry
 
 
 class DummyModel(BaseModel):

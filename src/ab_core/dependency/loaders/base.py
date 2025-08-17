@@ -13,7 +13,7 @@ from generic_preserver.wrapper import generic_preserver
 from pydantic import BaseModel, Discriminator, TypeAdapter, model_validator
 from pydantic_core.core_schema import CoreSchema
 
-from obo_core.dependency.utils import extract_target_types, type_name_intersection
+from ab_core.dependency.utils import extract_target_types, type_name_intersection
 
 from ..pydanticize import pydanticize
 

@@ -5,8 +5,8 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel, Discriminator, Field
 
-from obo_core.dependency.depends import Depends, Load
-from obo_core.dependency.loaders.environment_object import (
+from ab_core.dependency.depends import Depends, Load
+from ab_core.dependency.loaders.environment_object import (
     ObjectLoaderEnvironment,
 )
 

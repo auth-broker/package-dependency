@@ -7,7 +7,7 @@ dev = [
   "fastapi>= 0.78.0",
   "httpx>=0.28.1,<0.29",
   "isort>=6.0.1,<7",
-  "obo-test-fixtures",
+  "ab-test-fixtures",
   "pre-commit>=4.2.0,<5",
   "pytest-asyncio>=1.0.0,<2",
   "pytest-cov>=6.2.1,<7",
@@ -25,7 +25,7 @@ dependencies = [
   "pydantic>=2.11.7,<3"
 ]
 description = ""
-name = "obo-dependency"
+name = "ab-dependency"
 readme = "README.md"
 requires-python = ">=3.12, <4"
 version = "0.1.0"
@@ -34,13 +34,13 @@ version = "0.1.0"
 fastapi = ["fastapi>= 0.78.0"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/obo_core"]
+include = ["src/ab_core"]
 
 [tool.hatch.build.targets.wheel]
-include = ["src/obo_core"]
+include = ["src/ab_core"]
 
 [tool.hatch.build.targets.wheel.sources]
-"src/obo_core" = "obo_core"
+"src/ab_core" = "ab_core"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "session"
@@ -72,8 +72,3 @@ select = [
   "UP", # pyupgrade
   "W" # pycodestyle warnings
 ]
-
-[tool.uv]
-
-[tool.uv.sources]
-obo-test-fixtures = {editable = true, path = "../../obo_test/obo-test-fixtures"}

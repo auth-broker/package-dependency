@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
-from obo_core.dependency.depends import Load
+from ab_core.dependency.depends import Load
 
 
 def test_depends_complex_object():

@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel, Discriminator
 
-from obo_core.dependency.loaders.environment_object import ObjectLoaderEnvironment
+from ab_core.dependency.loaders.environment_object import ObjectLoaderEnvironment
 
 
 # --- Sample discriminated-subtype models for testing ---

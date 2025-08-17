@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from obo_core.dependency.loaders.environment import LoaderEnvironment
+from ab_core.dependency.loaders.environment import LoaderEnvironment
 
 
 @pytest.mark.parametrize(

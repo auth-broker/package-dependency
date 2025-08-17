@@ -3,8 +3,8 @@ from typing import Any, Dict, Literal, Optional, override
 
 from pydantic import model_validator
 
-from obo_core.dependency.schema.loader_type import LoaderSource
-from obo_core.dependency.utils import extract_env_tree, to_env_prefix
+from ab_core.dependency.schema.loader_type import LoaderSource
+from ab_core.dependency.utils import extract_env_tree, to_env_prefix
 
 from .base import ObjectLoaderBase, T
 

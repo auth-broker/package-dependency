@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from obo_core.dependency.utils import to_env_prefix, type_name_intersection
+from ab_core.dependency.utils import to_env_prefix, type_name_intersection
 
 
 class DummyStoreA(BaseModel): ...

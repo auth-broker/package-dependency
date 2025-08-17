@@ -1,5 +1,5 @@
 """
-FastAPI integration-tests for obo_core.dependency.inject
+FastAPI integration-tests for ab_core.dependency.inject
 — no module-level global state, endpoints use FastAPI’s Depends.
 """
 
@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 # your DI helpers stay available for *internal* deps
-from obo_core.dependency import Depends, inject, sentinel
+from ab_core.dependency import Depends, inject, sentinel
 
 
 # ------------------------------------------------------------------ #

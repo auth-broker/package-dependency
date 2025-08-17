@@ -1,5 +1,5 @@
 """
-Comprehensive test-suite for obo_core.dependency.Depends.
+Comprehensive test-suite for ab_core.dependency.Depends.
 
 New in this revision
 --------------------
@@ -15,7 +15,7 @@ from typing import Annotated, Any
 import pytest
 from pydantic import BaseModel
 
-from obo_core.dependency import Depends, inject, sentinel
+from ab_core.dependency import Depends, inject, sentinel
 
 # ------------------------------------------------------------------ #
 # Dummy dependencies                                                 #
