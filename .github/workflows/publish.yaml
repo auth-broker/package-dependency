@@ -1,0 +1,32 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions: read-all
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.head_ref || github.ref }} - release"
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: shared-github-ubuntu-latest-small
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Install project Python
+      run: uv python install
+
+    - name: Build dist
+      run: uv build --no-sources
+
+    - name: Publish to PyPI
+      run: uv publish --index pypi --verbose

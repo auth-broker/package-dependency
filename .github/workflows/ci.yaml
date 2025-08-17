@@ -1,0 +1,38 @@
+name: CI
+
+permissions:
+  contents: read
+  pull-requests: write
+  
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }} - ci-pipeline"
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: shared-github-ubuntu-latest-small
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build image
+        run: |
+          docker compose build
+
+      - name: run lint
+        run: |
+          docker compose run --entrypoint uv package run tox "-e lint"
+
+      - name: run tests
+        run: |
+          docker compose run --entrypoint uv package run tox "-e test"
+
+      - name: cleanup
+        if: always()
+        run: |
+          docker compose down --remove-orphans
