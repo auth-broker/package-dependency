@@ -7,7 +7,6 @@ dev = [
   "fastapi>= 0.78.0",
   "httpx>=0.28.1,<0.29",
   "isort>=6.0.1,<7",
-  "ab-test-fixtures",
   "pre-commit>=4.2.0,<5",
   "pytest-asyncio>=1.0.0,<2",
   "pytest-cov>=6.2.1,<7",
