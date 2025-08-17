@@ -1,0 +1,7 @@
+services:
+  package:
+    build: .
+    volumes:
+      - ./src:/package/src
+      - ./tests:/package/tests
+    command: tail -f /dev/null  # container runs indefinitely
