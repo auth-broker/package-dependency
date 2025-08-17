@@ -17,7 +17,7 @@ jobs:
     runs-on: shared-github-ubuntu-latest-small
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install uv
       uses: astral-sh/setup-uv@v6
