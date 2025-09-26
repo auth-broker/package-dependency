@@ -6,8 +6,7 @@ from .base import LoaderBase, T
 
 
 class LoaderTemplate(LoaderBase[T]):
-    """
-    A loader that picks a subtype of a Discriminated Union
+    """A loader that picks a subtype of a Discriminated Union
     from an env-var PREFIX_type, then scans PREFIX_type_{value}_{field}
     for every other field on that subtype.
     """
@@ -21,8 +20,7 @@ class LoaderTemplate(LoaderBase[T]):
     def load_raw(
         self,
     ) -> Any:
-        """
-        Collects environment variables to build a dict matching the discriminated union fields,
+        """Collects environment variables to build a dict matching the discriminated union fields,
         keyed by discriminator and field names, ready for Pydantic validation.
         """
         raise NotImplementedError()

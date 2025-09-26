@@ -1,5 +1,5 @@
 import os
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 from unittest.mock import patch
 
 import pytest
@@ -21,7 +21,7 @@ class DummyStoreB(BaseModel):
     flag: bool = False
 
 
-LoaderUnion = Annotated[Union[DummyStoreA, DummyStoreB], Discriminator("type")]
+LoaderUnion = Annotated[DummyStoreA | DummyStoreB, Discriminator("type")]
 
 
 @pytest.mark.parametrize(
