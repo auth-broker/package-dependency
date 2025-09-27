@@ -4,8 +4,9 @@ from unittest.mock import patch
 
 import pytest
 from pydantic import BaseModel, Discriminator, Field
-
+import attrs
 from ab_core.dependency.depends import Depends, Load
+from ab_core.dependency.pydanticize import pydanticize_type
 from ab_core.dependency.loaders.environment_object import (
     ObjectLoaderEnvironment,
 )
@@ -18,6 +19,7 @@ def env_patch():
         os.environ,
         {
             "CLASS_LABEL": "foo",
+            "ATTRS_LABEL": "foo",
         },
         clear=False,
     ):
@@ -48,7 +50,36 @@ def bar():
     return BarClass()
 
 
+
+
+# ========= attrs equivalents =========
+@attrs.define
+class FooAttrs:
+    label: Literal["foo"] = "foo"
+    foo: str = "foo"
+
+
+@attrs.define
+class BarAttrs:
+    label: Literal["bar"] = "bar"
+    bar: str = "bar"
+
+
+FooBarAttrs = Annotated[
+    pydanticize_type(FooAttrs) | pydanticize_type(BarAttrs),
+    Discriminator("label")
+]
+
+
 LOAD_TARGETS = [
+    # discriminated union of attrs classes
+    FooBarAttrs,
+    # attrs classes themselves
+    FooAttrs,
+    BarAttrs,
+    # environment loaders targeting attrs classes
+    ObjectLoaderEnvironment[FooAttrs](),
+    ObjectLoaderEnvironment[BarAttrs](),
     foo,
     bar,
     FooClass,
