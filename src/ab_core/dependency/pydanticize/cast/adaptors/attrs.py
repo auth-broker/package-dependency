@@ -3,7 +3,8 @@
 import inspect
 from typing import TYPE_CHECKING, Any, get_type_hints, override
 
-from pydantic import BaseModel, create_model, Field
+from pydantic import BaseModel, Field, create_model
+
 from .base import BaseTypePlugin
 
 HAS_ATTRS = True

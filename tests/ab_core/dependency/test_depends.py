@@ -2,14 +2,15 @@ import os
 from typing import Annotated, Literal
 from unittest.mock import patch
 
+import attrs
 import pytest
 from pydantic import BaseModel, Discriminator, Field
-import attrs
+
 from ab_core.dependency.depends import Depends, Load
-from ab_core.dependency.pydanticize import pydanticize_type
 from ab_core.dependency.loaders.environment_object import (
     ObjectLoaderEnvironment,
 )
+from ab_core.dependency.pydanticize import pydanticize_type
 
 
 @pytest.fixture
@@ -50,8 +51,6 @@ def bar():
     return BarClass()
 
 
-
-
 # ========= attrs equivalents =========
 @attrs.define
 class FooAttrs:
@@ -65,10 +64,7 @@ class BarAttrs:
     bar: str = "bar"
 
 
-FooBarAttrs = Annotated[
-    pydanticize_type(FooAttrs) | pydanticize_type(BarAttrs),
-    Discriminator("label")
-]
+FooBarAttrs = Annotated[pydanticize_type(FooAttrs) | pydanticize_type(BarAttrs), Discriminator("label")]
 
 
 LOAD_TARGETS = [

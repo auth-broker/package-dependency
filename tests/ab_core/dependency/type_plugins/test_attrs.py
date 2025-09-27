@@ -1,18 +1,17 @@
 # tests/test_attrs_plugin_via_router.py
-import types
+
 import attrs
 import pytest
-from typing import Optional, Union, Annotated
-
 from pydantic import BaseModel, ValidationError
+
 from ab_core.dependency.pydanticize import pydanticize_type
 
 
 def test_simple_required_and_defaults():
     @attrs.define
     class A:
-        x: int                                # required
-        y: str = "hi"                         # default
+        x: int  # required
+        y: str = "hi"  # default
         z: list[int] = attrs.field(factory=list)  # default_factory
 
     Model = pydanticize_type(A)
@@ -71,8 +70,8 @@ def test_nested_attrs_from_dict_is_parsed():
 def test_optional_and_union_are_supported_as_is():
     @attrs.define
     class A:
-        maybe: Optional[int]
-        either: Union[int, str]
+        maybe: int | None
+        either: int | str
 
     Model = pydanticize_type(A)
 
