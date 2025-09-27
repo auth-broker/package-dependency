@@ -16,7 +16,7 @@ jobs:
   publish:
     runs-on: 
       group: Default
-    timeout-minutes: 15
+    timeout-minutes: 5
 
     steps:
     - name: Checkout code
