@@ -23,6 +23,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Install Compose v2 plugin (quick, no apt)
+      - name: Install Docker Compose v2
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.docker/cli-plugins
+          curl -sSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+            -o ~/.docker/cli-plugins/docker-compose
+          chmod +x ~/.docker/cli-plugins/docker-compose
+          docker compose version
+
       - name: build image
         run: |
           docker compose build
