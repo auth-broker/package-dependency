@@ -12,7 +12,6 @@ help:
 .PHONY: install ## install required dependencies on bare metal
 install:
 	uv sync --extra all
-	uv run pre-commit install
 
 
 .PHONY: format ## Run the formatter on bare metal
