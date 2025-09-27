@@ -3,7 +3,7 @@ name: CI
 permissions:
   contents: read
   pull-requests: write
-  
+
 on:
   pull_request:
     branches: [main]
@@ -15,36 +15,37 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: 
+    runs-on:
       group: Default
     timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
 
-      # Install Compose v2 plugin (quick, no apt)
-      - name: Install Docker Compose v2
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.docker/cli-plugins
-          curl -sSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
-            -o ~/.docker/cli-plugins/docker-compose
-          chmod +x ~/.docker/cli-plugins/docker-compose
-          docker compose version
+      # Install uv (bundles its own Python installer)
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+          enable-cache: true            # cache uv/pip builds across runs
+          python-version: "3.12"        # locks the interpreter
 
-      - name: build image
+      # Give uv access to private GitHub repos used as git deps
+      # Prefer a fine-grained PAT with read access to the org repos
+      - name: Configure Git credentials for private deps
+        if: env.GH_READ_TOKEN != ''
+        env:
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}  # create this secret
         run: |
-          docker compose build
+          git config --global url."https://${GH_READ_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
-      - name: run lint
-        run: |
-          docker compose run --entrypoint uv package run tox "-e lint"
+      # Restore/create the virtualenv (cached by setup-uv)
+      - name: Sync deps
+        run: uv sync --extra all
 
-      - name: run tests
-        run: |
-          docker compose run --entrypoint uv package run tox "-e test"
+      # Lint + tests via tox (no Docker)
+      - name: Lint
+        run: uv run tox -e lint
 
-      - name: cleanup
-        if: always()
-        run: |
-          docker compose down --remove-orphans
+      - name: Test
+        run: uv run tox -e test
