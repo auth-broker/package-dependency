@@ -31,11 +31,11 @@ version = "0.1.2"
 
 [project.optional-dependencies]
 fastapi = ["fastapi>= 0.78.0"]
-attrs-plugin = [
-    "attrs>=25.0.0",
+all = [
+    "attrs>=22.2.0",
 ]
-dataclasses-plugin = [
-    # python native
+attrs-plugin = [
+    "attrs>=22.2.0",  # this version matches attrs used by the openapi cli generator
 ]
 
 [tool.hatch.build.targets.sdist]

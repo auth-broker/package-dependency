@@ -11,7 +11,7 @@ help:
 
 .PHONY: install ## install required dependencies on bare metal
 install:
-	uv sync
+	uv sync --extra all
 	uv run pre-commit install
 
 
