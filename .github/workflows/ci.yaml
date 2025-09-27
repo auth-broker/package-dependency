@@ -8,13 +8,12 @@ on:
   pull_request:
     branches: [main]
 
-# This allows a subsequently queued workflow run to interrupt previous runs
 concurrency:
   group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }} - ci-pipeline"
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  lint:
     runs-on:
       group: Default
     timeout-minutes: 5
@@ -22,30 +21,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install uv (bundles its own Python installer)
+      # Install uv + Python (with cache)
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
-          version: "latest"
-          enable-cache: true            # cache uv/pip builds across runs
-          python-version: "3.12"        # locks the interpreter
+          version: latest
+          enable-cache: true
+          python-version: "3.12"
 
-      # Give uv access to private GitHub repos used as git deps
-      # Prefer a fine-grained PAT with read access to the org repos
+      # Private Git deps (optional; remove if not needed)
       - name: Configure Git credentials for private deps
         if: env.GH_READ_TOKEN != ''
         env:
-          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}  # create this secret
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
         run: |
           git config --global url."https://${GH_READ_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
-      # Restore/create the virtualenv (cached by setup-uv)
       - name: Sync deps
         run: uv sync --extra all
 
-      # Lint + tests via tox (no Docker)
       - name: Lint
         run: uv run tox -e lint
+
+  test:
+    runs-on:
+      group: Default
+    timeout-minutes: 5
+    # Run in parallel with lint (remove this 'needs' to keep parallel; add needs: [lint] to serialize)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Configure Git credentials for private deps
+        if: env.GH_READ_TOKEN != ''
+        env:
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
+        run: |
+          git config --global url."https://${GH_READ_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
+      - name: Sync deps
+        run: uv sync --extra all
 
       - name: Test
         run: uv run tox -e test
