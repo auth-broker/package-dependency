@@ -16,7 +16,8 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: Default
+    runs-on: 
+      group: Default
     timeout-minutes: 15
 
     steps:
