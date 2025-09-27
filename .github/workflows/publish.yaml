@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: self-hosted
+    runs-on: default
     timeout-minutes: 15
 
     steps:
