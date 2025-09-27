@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   lint:
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on:
       group: Default
     timeout-minutes: 5
@@ -44,6 +45,7 @@ jobs:
         run: uv run tox -e lint
 
   test:
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on:
       group: Default
     timeout-minutes: 5
