@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -8,7 +8,7 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class SingletonRegistryMeta(type):
-    _instances: Dict[Tuple[Any, Any], BaseModel] = {}
+    _instances: dict[tuple[Any, Any], BaseModel] = {}
 
     def __call__(cls, loader: LoadTarget[T], key: Any) -> T:
         if key not in cls._instances:

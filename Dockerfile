@@ -25,10 +25,10 @@ RUN --mount=type=secret,id=github_token,target=/run/secrets/github_token,require
       TOKEN="$(cat /run/secrets/github_token)"; \
       printf "machine github.com\n  login %s\n  password %s\n" "$GITHUB_LOGIN" "$TOKEN" > /root/.netrc; \
       chmod 600 /root/.netrc; \
-      uv sync --no-install-project \
+      uv sync --no-install-project --extra all \
     '
 
 # Install remaining project
 COPY src ./src
 COPY tests ./tests
-RUN uv sync
+RUN uv sync --extra all

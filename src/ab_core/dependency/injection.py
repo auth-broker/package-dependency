@@ -24,6 +24,7 @@ The code is heavily documented; scroll down for implementation details.
 """
 
 import inspect
+from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack, ExitStack
 from dataclasses import dataclass
 from functools import wraps
@@ -32,8 +33,6 @@ from types import AsyncGeneratorType, GeneratorType
 from typing import (
     Annotated,
     Any,
-    Awaitable,
-    Callable,
     ParamSpec,
     TypeVar,
     get_args,
@@ -55,7 +54,8 @@ class _StartedDep:
     """Return type of :func:`_start_dep`. Holds the injected *value* and a
     *finaliser* callable.  The finaliser accepts the current exception (or
     ``None``) and returns an *optional awaitable*.  Its **return value is used
-    exactly like ``__exit__``: truthy ⇒ the exception is considered handled."""
+    exactly like ``__exit__``: truthy ⇒ the exception is considered handled.
+    """
 
     value: Any
     final: Callable[[BaseException | None], Awaitable[None] | None]
@@ -71,7 +71,6 @@ def _start_dep(dep: Depends, *, allow_async: bool) -> _StartedDep:
     3. **coroutine** - return coroutine object (await later)
     4. **plain value** - return it directly
     """
-
     obj = dep()  # may be value | coroutine | gen | async-gen
 
     # -- 1) Synchronous generator ----------------------------------
@@ -141,8 +140,8 @@ def _bind_all(
     astack: AsyncExitStack | None,
 ) -> list[Callable[[BaseException | None], Awaitable[None] | None]]:
     """Populate *bound* with values for every parameter annotated with
-    :class:`Depends` and return their finalisers (LIFO order)."""
-
+    :class:`Depends` and return their finalisers (LIFO order).
+    """
     finals: list[Callable[[BaseException | None], Awaitable[None] | None]] = []
 
     for name, param in sig.parameters.items():

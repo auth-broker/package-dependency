@@ -1,10 +1,10 @@
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Optional
 
 import pytest
 from deepdiff import DeepDiff
 from pydantic import BaseModel, Discriminator, TypeAdapter
 
-from ab_core.dependency.pydanticize import pydanticize
+from ab_core.dependency.pydanticize import pydanticize_data
 
 
 # 1) define our union types
@@ -23,7 +23,7 @@ class C(BaseModel):
     extra: str
 
 
-ABC = Annotated[Union[A, B, C], Discriminator("letter")]
+ABC = Annotated[A | B | C, Discriminator("letter")]
 
 
 class ABCHierarchy(BaseModel):
@@ -47,7 +47,7 @@ class Three(BaseModel):
     extra: str
 
 
-OneTwoThree = Annotated[Union[One, Two, Three], Discriminator("number")]
+OneTwoThree = Annotated[One | Two | Three, Discriminator("number")]
 
 
 class MultiValue1(BaseModel):
@@ -60,7 +60,7 @@ class MultiValue2(BaseModel):
     extra: str
 
 
-MultiValue = Annotated[Union[MultiValue1, MultiValue2], Discriminator("type")]
+MultiValue = Annotated[MultiValue1 | MultiValue2, Discriminator("type")]
 
 
 class Group(BaseModel):
@@ -208,6 +208,6 @@ class WithUnderscore(BaseModel):
     ],
 )
 def test_flatten_discriminator_all_cases(before, core_schema, after):
-    got = pydanticize(before, core_schema)
+    got = pydanticize_data(before, core_schema)
     diff = DeepDiff(got, after, ignore_order=True)
     assert diff == {}

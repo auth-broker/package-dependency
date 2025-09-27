@@ -1,7 +1,8 @@
 import inspect
 import os
 import re
-from typing import Iterator, List, Type, get_args
+from collections.abc import Iterator
+from typing import get_args
 
 
 def str_intersection(*args: str) -> str:
@@ -25,8 +26,7 @@ def type_name_intersection(types: tuple[type, ...]) -> str:
 
 
 def to_env_prefix(name: str) -> str:
-    """
-    Convert CamelCase or PascalCase to ENV_VAR_STYLE (uppercase with underscores).
+    """Convert CamelCase or PascalCase to ENV_VAR_STYLE (uppercase with underscores).
     E.g. 'OAuth2TokenStore' -> 'OAUTH2_TOKEN_STORE'
     """
     s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
@@ -58,7 +58,7 @@ def extract_discriminator_from_env(
 
 
 def extract_env_tree(env: dict[str, str], prefix: str) -> dict:
-    def insert_recursive(current: dict, keys: List[str], value: str):
+    def insert_recursive(current: dict, keys: list[str], value: str):
         key = keys[0].lower()
         if len(keys) == 1:
             current[key] = value
@@ -81,7 +81,7 @@ def extract_env_tree(env: dict[str, str], prefix: str) -> dict:
     return result
 
 
-def walk_types_args(t_base: Type):
+def walk_types_args(t_base: type):
     def walk(t):
         yield t
 
@@ -93,15 +93,14 @@ def walk_types_args(t_base: Type):
     yield from walk(t_base)
 
 
-def extract_target_types(obj: Type, target_type: Type) -> Iterator[Type | object]:
+def extract_target_types(obj: type, target_type: type) -> Iterator[type | object]:
     for t in walk_types_args(obj):
         if isinstance(t, target_type) or isinstance(t, type) and issubclass(t, target_type):
             yield t
 
 
 def is_real_callable(obj) -> bool:
-    """
-    True for user code we actually want to execute as a loader.
+    """True for user code we actually want to execute as a loader.
     False for typing constructs (Union, Annotated, etc.) that merely
     *happen* to be callable.
     """
@@ -110,11 +109,7 @@ def is_real_callable(obj) -> bool:
         return True
 
     # 2. Generator / coroutine / async‑gen functions.
-    if (
-        inspect.iscoroutinefunction(obj)
-        or inspect.isgeneratorfunction(obj)
-        or inspect.isasyncgenfunction(obj)
-    ):
+    if inspect.iscoroutinefunction(obj) or inspect.isgeneratorfunction(obj) or inspect.isasyncgenfunction(obj):
         return True
 
     return False

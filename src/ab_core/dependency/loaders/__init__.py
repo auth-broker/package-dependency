@@ -7,6 +7,6 @@ from .environment_object import ObjectLoaderEnvironment
 from .template import LoaderTemplate
 
 Loader = Annotated[
-    Union[ObjectLoaderEnvironment, LoaderEnvironment, LoaderTemplate],
+    ObjectLoaderEnvironment | LoaderEnvironment | LoaderTemplate,
     Discriminator("source"),
 ]

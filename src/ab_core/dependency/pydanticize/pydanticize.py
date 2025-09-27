@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic_core.core_schema import CoreSchema
 
@@ -7,13 +7,12 @@ COMPLEX_SCHEMA_TYPES = {"list"}
 
 
 def _clean_field(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     field_path: list[str] | str,
     *,
     key_delim: str = "_",
 ) -> None:
-    """
-    Remove the branch specified by `field_path`. After deleting the leaf,
+    """Remove the branch specified by `field_path`. After deleting the leaf,
     recursively delete any parent keys that become empty dictionaries.
 
     Parameters
@@ -37,6 +36,7 @@ def _clean_field(
     >>> _clean_field(data, ["a", "b"])
     >>> data
     {'a': {'c': 2}}
+
     """
     # Normalise the path into a list of keys
     if isinstance(field_path, str):
@@ -71,7 +71,7 @@ def _clean_field(
 
 
 def _align_field(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     field_name: str,
     *,
     key_delim: str = "_",
@@ -115,12 +115,12 @@ def _decode_complex_value(value: Any):
 
 
 def pydanticize_model_fields(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     schema: CoreSchema,
     *,
-    definition_map: Optional[dict] = None,
+    definition_map: dict | None = None,
     decode_complex_values: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     fields = schema["fields"]
     for field_name, field_schema in fields.items():
         _align_field(obj, field_name)
@@ -128,7 +128,7 @@ def pydanticize_model_fields(
         if field_name not in obj:
             continue
 
-        obj[field_name] = pydanticize(
+        obj[field_name] = pydanticize_data(
             obj.pop(field_name),
             field_schema,
             definition_map=definition_map,
@@ -139,17 +139,17 @@ def pydanticize_model_fields(
 
 
 def pydanticize_model_field(
-    obj: Dict[str, Any] | Any,
+    obj: dict[str, Any] | Any,
     schema: CoreSchema,
     *,
-    definition_map: Optional[dict] = None,
+    definition_map: dict | None = None,
     decode_complex_values: bool = True,
-) -> Dict[str, Any] | Any:
+) -> dict[str, Any] | Any:
     if decode_complex_values and _is_complex_schema(schema):
         return _decode_complex_value(obj)
 
     if obj is not None and "schema" in schema:
-        return pydanticize(
+        return pydanticize_data(
             obj,
             schema["schema"],
             definition_map=definition_map,
@@ -160,18 +160,17 @@ def pydanticize_model_field(
 
 
 def pydanticize_tagged_union(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     schema: CoreSchema,
     *,
-    definition_map: Optional[dict] = None,
+    definition_map: dict | None = None,
     decode_complex_values: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     discriminator = schema["discriminator"]
     discriminator_choice = obj[discriminator]
     if not isinstance(discriminator_choice, str):
         raise TypeError(
-            f"Invalid Discriminator Choice. Expected {repr(str)},"
-            f" found {repr(type(discriminator_choice))}."
+            f"Invalid Discriminator Choice. Expected {repr(str)}, found {repr(type(discriminator_choice))}."
         )
 
     # the name of the field on obj which points to values
@@ -185,11 +184,10 @@ def pydanticize_tagged_union(
         discriminator_values = obj.pop(discriminator_choice.lower())
         if not isinstance(discriminator_values, dict):
             raise TypeError(
-                f"Invalid Discriminator Body. Expected {repr(dict)},"
-                f" found {repr(type(discriminator_values))}."
+                f"Invalid Discriminator Body. Expected {repr(dict)}, found {repr(type(discriminator_values))}."
             )
         discriminator_choice_schema = schema["choices"][discriminator_choice]
-        pydanticized_body = pydanticize(
+        pydanticized_body = pydanticize_data(
             discriminator_values,
             discriminator_choice_schema,
             definition_map=definition_map,
@@ -201,19 +199,19 @@ def pydanticize_tagged_union(
 
 
 def pydanticize_definitions(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     schema: CoreSchema,
     *,
-    definition_map: Optional[dict] = None,
+    definition_map: dict | None = None,
     decode_complex_values: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     if definition_map is None:
         definition_map = {}
     definitions = schema["definitions"]
     for definition in definitions:
         definition_map[definition["ref"]] = definition
 
-    return pydanticize(
+    return pydanticize_data(
         obj,
         schema["schema"],
         definition_map=definition_map,
@@ -222,15 +220,15 @@ def pydanticize_definitions(
 
 
 def pydanticize_definition_ref(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     schema: CoreSchema,
     *,
-    definition_map: Optional[dict] = None,
+    definition_map: dict | None = None,
     decode_complex_values: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     schema_ref = schema["schema_ref"]
     schema = definition_map[schema_ref]
-    return pydanticize(
+    return pydanticize_data(
         obj,
         schema,
         definition_map=definition_map,
@@ -239,14 +237,14 @@ def pydanticize_definition_ref(
 
 
 def pydanticize_child_schema(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     schema: CoreSchema,
     *,
-    definition_map: Optional[dict] = None,
+    definition_map: dict | None = None,
     decode_complex_values: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     field_schema = schema["schema"]
-    return pydanticize(
+    return pydanticize_data(
         obj,
         field_schema,
         definition_map=definition_map,
@@ -254,13 +252,13 @@ def pydanticize_child_schema(
     )
 
 
-def pydanticize(
-    obj: Dict[str, Any] | Any,
+def pydanticize_data(
+    obj: dict[str, Any] | Any,
     core_schema: CoreSchema,
     *,
-    definition_map: Optional[dict] = None,
+    definition_map: dict | None = None,
     decode_complex_values: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     if definition_map is None:
         definition_map = {}
 

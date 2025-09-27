@@ -1,5 +1,4 @@
-"""
-Comprehensive test-suite for ab_core.dependency.Depends.
+"""Comprehensive test-suite for ab_core.dependency.Depends.
 
 New in this revision
 --------------------

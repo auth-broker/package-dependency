@@ -2,6 +2,7 @@ import os
 from typing import Annotated, Literal
 from unittest.mock import patch
 
+import attrs
 import pytest
 from pydantic import BaseModel, Discriminator, Field
 
@@ -9,6 +10,7 @@ from ab_core.dependency.depends import Depends, Load
 from ab_core.dependency.loaders.environment_object import (
     ObjectLoaderEnvironment,
 )
+from ab_core.dependency.pydanticize import pydanticize_type
 
 
 @pytest.fixture
@@ -18,21 +20,28 @@ def env_patch():
         os.environ,
         {
             "CLASS_LABEL": "foo",
+            "ATTRS_LABEL": "foo",
         },
         clear=False,
     ):
         yield
 
 
-# depends on a class
+# ========= pydantic classes =========
 class FooClass(BaseModel):
     label: Literal["foo"] = "foo"
     foo: str = "foo"
+
+    def identity(self) -> str:
+        return f"{self.label}:{self.foo}"
 
 
 class BarClass(BaseModel):
     label: Literal["bar"] = "bar"
     bar: str = "bar"
+
+    def identity(self) -> str:
+        return f"{self.label}:{self.bar}"
 
 
 # depends on an pydantic discriminated union
@@ -48,7 +57,37 @@ def bar():
     return BarClass()
 
 
+# ========= attrs equivalents =========
+@attrs.define
+class FooAttrs:
+    label: Literal["foo"] = "foo"
+    foo: str = "foo"
+
+    def identity(self) -> str:
+        return f"{self.label}:{self.foo}"
+
+
+@attrs.define
+class BarAttrs:
+    label: Literal["bar"] = "bar"
+    bar: str = "bar"
+
+    def identity(self) -> str:
+        return f"{self.label}:{self.bar}"
+
+
+FooBarAttrs = Annotated[pydanticize_type(FooAttrs) | pydanticize_type(BarAttrs), Discriminator("label")]
+
+
 LOAD_TARGETS = [
+    # discriminated union of attrs classes
+    FooBarAttrs,
+    # attrs classes themselves
+    FooAttrs,
+    BarAttrs,
+    # environment loaders targeting attrs classes
+    ObjectLoaderEnvironment[FooAttrs](),
+    ObjectLoaderEnvironment[BarAttrs](),
     foo,
     bar,
     FooClass,
@@ -125,3 +164,15 @@ def test_lazy_depends_from_loader_pydantic(load_target, env_patch):
     # pydantic performs a deep copy beehind the scenes
     assert inst.one is inst.two
     assert inst.one == inst.two
+
+
+@pytest.mark.parametrize("load_target", LOAD_TARGETS)
+def test_identity_method(load_target, env_patch):
+    # Load an instance
+    instance = Depends(load_target, persist=False)()
+    # Ensure the method exists
+    assert hasattr(instance, "identity")
+    # Call the method and check consistency
+    result = instance.identity()
+    assert isinstance(result, str)
+    assert result.startswith(instance.label + ":")

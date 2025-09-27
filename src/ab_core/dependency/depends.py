@@ -25,7 +25,8 @@ There are two public entry‑points:
 Both share a single private implementation, so maintenance cost is low.
 """
 
-from typing import Awaitable, Generic, TypeVar, Union
+from collections.abc import Awaitable
+from typing import Generic, TypeVar, Union
 
 from .loaders.base import LoaderBase
 from .singleton import SingletonRegistry
@@ -33,7 +34,7 @@ from .types import LoadTarget
 from .utils import is_real_callable
 
 
-class NullDepends(object):
+class NullDepends:
     def __init__(self, *args, **kwargs): ...
 
 
@@ -77,8 +78,7 @@ def _load_impl(load_target: LoadTarget[T], *, persist: bool) -> T:  # noqa: C901
         return loader()
 
     raise TypeError(
-        f"Unsupported load_target type: {type(load_target).__name__}. "
-        "Expected LoaderBase instance, class, or callable."
+        f"Unsupported load_target type: {type(load_target).__name__}. Expected LoaderBase instance, class, or callable."
     )
 
 

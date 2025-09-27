@@ -1,9 +1,8 @@
-"""
-FastAPI integration-tests for ab_core.dependency.inject
+"""FastAPI integration-tests for ab_core.dependency.inject
 — no module-level global state, endpoints use FastAPI’s Depends.
 """
 
-from typing import Annotated, Dict, Tuple
+from typing import Annotated
 
 import pytest
 from fastapi import Depends as FDepends
@@ -41,15 +40,15 @@ def _check_ok(resp):
 # ------------------------------------------------------------------ #
 # Fixture: build app + trackers dynamically                           #
 # ------------------------------------------------------------------ #
-def _build_app() -> Tuple[TestClient, Dict[str, int], Dict[str, int]]:
-    """
-    Build a fresh FastAPI app *and* per-test trackers.
+def _build_app() -> tuple[TestClient, dict[str, int], dict[str, int]]:
+    """Build a fresh FastAPI app *and* per-test trackers.
 
     Returns
     -------
     client          : TestClient
     sync_tracker    : {"closed": int, "caught": Exception|None}
     async_tracker   : same schema as sync_tracker
+
     """
     sync_tracker = {"closed": 0, "caught": None}
     async_tracker = {"closed": 0, "caught": None}

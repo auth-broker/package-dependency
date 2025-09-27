@@ -1,5 +1,5 @@
 import os
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal
 from unittest.mock import patch
 
 import pytest
@@ -13,9 +13,9 @@ def test_depends_complex_object():
     class ComplexObject(BaseModel):
         annotated_list: Annotated[list[float], Field(description="List of floats")]
         list_value: list[str]
-        optional_list: Optional[list[int]]
+        optional_list: list[int] | None
         list_of_annotated: list[Annotated[str, Field(min_length=1)]]
-        union_list: Union[list[str], None]
+        union_list: list[str] | None
         literal_list: list[Literal["A", "B", "C"]]
 
     with patch.dict(

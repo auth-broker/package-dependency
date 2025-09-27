@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Literal, Optional, override
+from typing import Any, Literal, override
 
 from pydantic import model_validator
 
@@ -10,8 +10,7 @@ from .base import ObjectLoaderBase, T
 
 
 class ObjectLoaderEnvironment(ObjectLoaderBase[T]):
-    """
-    A loader that picks a subtype of a Discriminated Union
+    """A loader that picks a subtype of a Discriminated Union
     from an env-var PREFIX_type, then scans PREFIX_type_{value}_{field}
     for every other field on that subtype.
     """
@@ -19,7 +18,7 @@ class ObjectLoaderEnvironment(ObjectLoaderBase[T]):
     # These get pulled from env or you can override in code:
     source: Literal[LoaderSource.ENVIRONMENT_OBJECT] = LoaderSource.ENVIRONMENT_OBJECT
 
-    env_prefix: Optional[str] = None
+    env_prefix: str | None = None
 
     @model_validator(mode="after")
     def default_env_prefix(self):
@@ -30,12 +29,10 @@ class ObjectLoaderEnvironment(ObjectLoaderBase[T]):
     @override
     def load_raw(
         self,
-    ) -> Dict[str, Any]:
-        """
-        Collects environment variables to build a dict matching the discriminated union fields,
+    ) -> dict[str, Any]:
+        """Collects environment variables to build a dict matching the discriminated union fields,
         keyed by discriminator and field names, ready for Pydantic validation.
         """
-
         tree = extract_env_tree(
             os.environ,
             self.env_prefix,

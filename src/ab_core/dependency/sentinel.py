@@ -5,8 +5,7 @@ _INJECT_SENTINEL = object()  # unique, never used at runtime
 
 
 def sentinel() -> _T:  # noqa: N802  (capital I for clarity)
-    """
-    Typing-only sentinel for DI parameters.
+    """Typing-only sentinel for DI parameters.
 
     Usage:
         db: Annotated[Database, Depends(make_db)] = Sentinel()
