@@ -16,7 +16,9 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: shared-github-ubuntu-latest-small
+    runs-on: self-hosted
+    timeout-minutes: 15
+
     steps:
       - uses: actions/checkout@v4
 
