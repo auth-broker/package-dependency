@@ -30,46 +30,11 @@
             "detail": "run unit tests on bare metal"
         },
         {
-            "label": "clean-docker",
-            "type": "shell",
-            "command": "make clean-docker",
-            "group": "build",
-            "detail": "Purge / remove related docker entities"
-        },
-        {
-            "label": "build-docker",
-            "type": "shell",
-            "command": "make build-docker",
-            "group": "build",
-            "detail": "Build the main image in docker"
-        },
-        {
-            "label": "run-docker",
-            "type": "shell",
-            "command": "make run-docker",
-            "group": "build",
-            "detail": "Runs containers with watching"
-        },
-        {
-            "label": "test-docker",
-            "type": "shell",
-            "command": "make test-docker",
-            "group": "build",
-            "detail": "run unit tests in docker"
-        },
-        {
             "label": "publish",
             "type": "shell",
             "command": "make publish",
             "group": "build",
             "detail": "Build & publish the package to Nexus"
-        },
-        {
-            "label": "help",
-            "type": "shell",
-            "command": "make help",
-            "group": "build",
-            "detail": "Show make targets help"
         }
     ]
 }
