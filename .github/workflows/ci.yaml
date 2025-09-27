@@ -3,48 +3,70 @@ name: CI
 permissions:
   contents: read
   pull-requests: write
-  
+
 on:
   pull_request:
     branches: [main]
 
-# This allows a subsequently queued workflow run to interrupt previous runs
 concurrency:
   group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }} - ci-pipeline"
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    runs-on: 
+  lint:
+    runs-on:
       group: Default
     timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
 
-      # Install Compose v2 plugin (quick, no apt)
-      - name: Install Docker Compose v2
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.docker/cli-plugins
-          curl -sSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
-            -o ~/.docker/cli-plugins/docker-compose
-          chmod +x ~/.docker/cli-plugins/docker-compose
-          docker compose version
+      # Install uv + Python (with cache)
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+          enable-cache: true
+          python-version: "3.12"
 
-      - name: build image
+      # Private Git deps (optional; remove if not needed)
+      - name: Configure Git credentials for private deps
+        if: env.GH_READ_TOKEN != ''
+        env:
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
         run: |
-          docker compose build
+          git config --global url."https://${GH_READ_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
-      - name: run lint
-        run: |
-          docker compose run --entrypoint uv package run tox "-e lint"
+      - name: Sync deps
+        run: uv sync --extra all
 
-      - name: run tests
-        run: |
-          docker compose run --entrypoint uv package run tox "-e test"
+      - name: Lint
+        run: uv run tox -e lint
 
-      - name: cleanup
-        if: always()
+  test:
+    runs-on:
+      group: Default
+    timeout-minutes: 5
+    # Run in parallel with lint (remove this 'needs' to keep parallel; add needs: [lint] to serialize)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Configure Git credentials for private deps
+        if: env.GH_READ_TOKEN != ''
+        env:
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
         run: |
-          docker compose down --remove-orphans
+          git config --global url."https://${GH_READ_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
+      - name: Sync deps
+        run: uv sync --extra all
+
+      - name: Test
+        run: uv run tox -e test
