@@ -56,45 +56,55 @@ class AttrsPlugin(BaseTypePlugin):
         """Convert an attrs-decorated class to a Pydantic BaseModel."""
         from ab_core.dependency.pydanticize import is_supported_by_pydantic, pydanticize_type
 
-        # Name used for the generated model
-        name = f"{_type.__name__}"
-
-        # Resolve annotations with extras and forward refs
+        name = _type.__name__
         hints = get_type_hints(_type, include_extras=True)
-
         pyd_fields: dict[str, tuple[type[Any], Any]] = {}
 
         for f in fields(_type):
             attr_name = f.name
             ann = hints.get(attr_name, Any)
+            if not is_supported_by_pydantic(ann):
+                ann = pydanticize_type(ann)
 
-            # If Pydantic already supports this type directly, keep it.
-            # Otherwise, recursively "pydanticize" the type (this will route to
-            # the correct plugin, including this one for nested attrs classes).
-            try:
-                if not is_supported_by_pydantic(ann):
-                    ann = pydanticize_type(ann)
-            except Exception:
-                # Don't mask adapter/plugin errors: surface them so callers see
-                # that this plugin doesn't support the provided type.
-                raise
-
-            # Determine default / default_factory from attrs field
             default_value = f.default
             default_factory = getattr(f.default, "factory", None)
 
             if default_factory is not None:
-                # attrs uses a Factory wrapper for factories; pydantic expects Field(default_factory=...)
                 pyd_fields[attr_name] = (ann, Field(default_factory=default_factory))
             elif default_value is not NOTHING:
                 pyd_fields[attr_name] = (ann, default_value)
             else:
-                # Required field
                 pyd_fields[attr_name] = (ann, ...)
 
+        # ---- build a dynamic mixin that carries methods/props/constants ----
+        mixin_ns: dict[str, Any] = {}
+
+        def _is_descriptor(obj: object) -> bool:
+            return isinstance(obj, (property, classmethod, staticmethod))
+
+        def _should_include_member(name: str, obj: object) -> bool:
+            if name.startswith("__") and name.endswith("__"):
+                return False  # keep dunders out by default
+            if name in pyd_fields:  # fields are set by create_model
+                return False
+            # include instance methods, descriptors, and non-callable class constants
+            return inspect.isfunction(obj) or _is_descriptor(obj) or (not callable(obj))
+
+        for m_name, obj in inspect.getmembers(_type):
+            if _should_include_member(m_name, obj):
+                mixin_ns[m_name] = obj
+
+        # preserve docstring for niceness
+        if getattr(_type, "__doc__", None):
+            mixin_ns.setdefault("__doc__", _type.__doc__)
+
+        MethodsMixin = type(f"{name}MethodsMixin", (BaseModel,), mixin_ns)
+
+        # ---- now create the actual model, using the mixin as the base ----
         Model = create_model(
             name,
-            __base__=BaseModel,
+            __base__=MethodsMixin,
             **pyd_fields,
         )
+        Model.__module__ = getattr(_type, "__module__", Model.__module__)
         return Model

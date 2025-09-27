@@ -27,15 +27,21 @@ def env_patch():
         yield
 
 
-# depends on a class
+# ========= pydantic classes =========
 class FooClass(BaseModel):
     label: Literal["foo"] = "foo"
     foo: str = "foo"
+
+    def identity(self) -> str:
+        return f"{self.label}:{self.foo}"
 
 
 class BarClass(BaseModel):
     label: Literal["bar"] = "bar"
     bar: str = "bar"
+
+    def identity(self) -> str:
+        return f"{self.label}:{self.bar}"
 
 
 # depends on an pydantic discriminated union
@@ -57,11 +63,17 @@ class FooAttrs:
     label: Literal["foo"] = "foo"
     foo: str = "foo"
 
+    def identity(self) -> str:
+        return f"{self.label}:{self.foo}"
+
 
 @attrs.define
 class BarAttrs:
     label: Literal["bar"] = "bar"
     bar: str = "bar"
+
+    def identity(self) -> str:
+        return f"{self.label}:{self.bar}"
 
 
 FooBarAttrs = Annotated[pydanticize_type(FooAttrs) | pydanticize_type(BarAttrs), Discriminator("label")]
@@ -152,3 +164,15 @@ def test_lazy_depends_from_loader_pydantic(load_target, env_patch):
     # pydantic performs a deep copy beehind the scenes
     assert inst.one is inst.two
     assert inst.one == inst.two
+
+
+@pytest.mark.parametrize("load_target", LOAD_TARGETS)
+def test_identity_method(load_target, env_patch):
+    # Load an instance
+    instance = Depends(load_target, persist=False)()
+    # Ensure the method exists
+    assert hasattr(instance, "identity")
+    # Call the method and check consistency
+    result = instance.identity()
+    assert isinstance(result, str)
+    assert result.startswith(instance.label + ":")
