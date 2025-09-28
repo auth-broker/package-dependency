@@ -1,368 +1,322 @@
-"""ab_core.dependency.inject
-================================
-Unified dependency-injection decorator that works for **plain functions**, **coroutines**,
-**generators**, and **async-generators** as well as **classes**.  It mirrors the resource-cleanup
-rules used by
-`contextlib.ExitStack` *and* FastAPI’s own dependency system, so writing
-and reasoning about resources feels completely familiar.
-
-Bullet-point tour
------------------
-* **Single entry-point** - `@inject`.
-* **Single start helper** - `_start_dep` starts a :class:`~ab_core.dependency.Depends` object and
-returns *(value, finaliser)*.
-* **Single finaliser runner** - `_finalise_sync` / `_finalise_async` imitate
-  `ExitStack` exactly (truthy return ⇒ suppress).
-* **Zero surprises** - a dependency generator that
-  *catches* an injected exception swallows it; one that re-raises lets it
-  bubble; a dependency can also suppress by returning ``True``.
-* **FastAPI-aware** - because :class:`~ab_core.dependency.Depends` is a
-  subclass of ``fastapi.Depends`` FastAPI recognises parameters marked
-  with it as dependencies, not request-body fields.
-
-The code is heavily documented; scroll down for implementation details.
-"""
+# ab_core/dependency/inject.py
 
 import inspect
-from collections.abc import Awaitable, Callable
-from contextlib import AsyncExitStack, ExitStack
-from dataclasses import dataclass
+from contextlib import ExitStack, AsyncExitStack, contextmanager, asynccontextmanager
 from functools import wraps
 from inspect import isawaitable
-from types import AsyncGeneratorType, GeneratorType
-from typing import (
-    Annotated,
-    Any,
-    ParamSpec,
-    TypeVar,
-    get_args,
-    get_origin,
-    overload,
-)
+from types import GeneratorType, AsyncGeneratorType
+from typing import Annotated, Any, Awaitable, Callable, ParamSpec, TypeVar, get_args, get_origin, overload
 
 from .depends import Depends
 
-P = ParamSpec("P")  # parameter pack for decorated callables
-R = TypeVar("R")  # return-type variable
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
-# -------------------------------------------------------------------- #
-# 1.  Start a single dependency                                        #
-# -------------------------------------------------------------------- #
-@dataclass(slots=True)
-class _StartedDep:
-    """Return type of :func:`_start_dep`. Holds the injected *value* and a
-    *finaliser* callable.  The finaliser accepts the current exception (or
-    ``None``) and returns an *optional awaitable*.  Its **return value is used
-    exactly like ``__exit__``: truthy ⇒ the exception is considered handled.
-    """
-
-    value: Any
-    final: Callable[[BaseException | None], Awaitable[None] | None]
-
-
-def _start_dep(dep: Depends, *, allow_async: bool) -> _StartedDep:
-    """Instantiate *dep* and return the first value plus a finaliser.
-
-    The function handles four kinds of loader outputs:
-
-    1. **sync generator** - yield the first item, keep generator object
-    2. **async generator** -                …
-    3. **coroutine** - return coroutine object (await later)
-    4. **plain value** - return it directly
-    """
-    obj = dep()  # may be value | coroutine | gen | async-gen
-
-    # -- 1) Synchronous generator ----------------------------------
+# ---------- Wrap a single provider as a *sync* context manager ----------
+@contextmanager
+def _dep_to_cm(dep: Depends):
+    obj = dep()  # value | awaitable | gen | async-gen
+    # sync generator dep
     if isinstance(obj, GeneratorType):
         try:
-            value = next(obj)
-        except StopIteration:  # pragma: no cover - degenerate loader
-            raise RuntimeError("Generator dependency produced no value") from None
-
-        def _final(exc: BaseException | None):
+            val = next(obj)
+            yield val
+            # normal completion: drive teardown path without GeneratorExit
             try:
-                if exc:
-                    obj.throw(exc)
-                else:
-                    obj.close()
-            except StopIteration:  # generator swallowed → suppress
-                return bool(exc)
-            return None  # propagate decision upwards
+                obj.send(None)
+            except StopIteration:
+                pass
+        except BaseException as exc:
+            # error path: propagate into generator for cleanup
+            try:
+                obj.throw(exc)
+            except StopIteration:
+                pass
+            raise
+        return
 
-        return _StartedDep(value, _final)
-
-    # -- 2) Asynchronous generator ---------------------------------
+    # async generator dep (allowed in sync only if it yields a sync-safe value)
     if isinstance(obj, AsyncGeneratorType):
+        raise RuntimeError("Async-generator dependency cannot be used in a sync context")
 
-        async def _first():
-            try:
-                return await obj.__anext__()
-            except StopAsyncIteration:
-                raise RuntimeError("Async-generator produced no value") from None
-
-        async def _final(exc: BaseException | None):
-            try:
-                if exc:
-                    await obj.athrow(exc)
-                else:
-                    await obj.aclose()
-            except StopAsyncIteration:
-                return bool(exc)
-            return None
-
-        return _StartedDep(_first(), _final)
-
-    # -- 3) Coroutine ----------------------------------------------
+    # awaitable (not allowed in sync)
     if isawaitable(obj):
-        if not allow_async:
-            raise RuntimeError("Async dependency used inside a synchronous handler.")
+        raise RuntimeError("Awaitable dependency cannot be used in a sync context")
 
-        async def _noop(_: BaseException | None):
-            return None
-
-        return _StartedDep(obj, _noop)
-
-    # -- 4) Plain value --------------------------------------------
-    return _StartedDep(obj, lambda _: None)
+    # plain value
+    try:
+        yield obj
+    finally:
+        pass
 
 
-# -------------------------------------------------------------------- #
-# 2.  Bind *all* dependencies for a callable                           #
-# -------------------------------------------------------------------- #
+# ---------- Wrap a single provider as an *async* context manager ----------
+@asynccontextmanager
+async def _dep_to_acm(dep: Depends):
+    obj = dep()
+    # async generator dep
+    if isinstance(obj, AsyncGeneratorType):
+        try:
+            val = await obj.__anext__()
+            yield val
+            # normal completion: drive teardown path without GeneratorExit
+            try:
+                await obj.asend(None)
+            except StopAsyncIteration:
+                pass
+        except BaseException as exc:
+            try:
+                await obj.athrow(exc)
+            except StopAsyncIteration:
+                pass
+            raise
+        return
+
+    # sync generator dep (lift into async by using the sync CM inside)
+    if isinstance(obj, GeneratorType):
+        with _dep_to_cm(lambda: obj):  # reuse sync wrapper
+            # re-call dep() would recreate the gen; wrap the *object* instead
+            # so we need a lambda that returns the same generator object
+            # NOTE: since we already have `obj` (the generator), this works.
+            val = next(obj)  # consume here to get the value
+            try:
+                yield val
+                try:
+                    obj.send(None)
+                except StopIteration:
+                    pass
+            except BaseException as exc:
+                try:
+                    obj.throw(exc)
+                except StopIteration:
+                    pass
+                raise
+        return
+
+    # awaitable → value
+    if isawaitable(obj):
+        val = await obj  # type: ignore[func-returns-value]
+        try:
+            yield val
+        finally:
+            pass
+        return
+
+    # plain value
+    try:
+        yield obj
+    finally:
+        pass
 
 
-def _bind_all(
-    sig: inspect.Signature,
-    bound: inspect.BoundArguments,
-    *,
-    stack: ExitStack,
-    astack: AsyncExitStack | None,
-) -> list[Callable[[BaseException | None], Awaitable[None] | None]]:
-    """Populate *bound* with values for every parameter annotated with
-    :class:`Depends` and return their finalisers (LIFO order).
-    """
-    finals: list[Callable[[BaseException | None], Awaitable[None] | None]] = []
-
+# ---------- Resolve & enter all dependencies ----------
+def _collect_dep_specs(sig: inspect.Signature):
+    specs: list[tuple[str, Depends]] = []
     for name, param in sig.parameters.items():
-        if name in bound.arguments:
-            continue  # caller supplied a value
         anno = param.annotation
         if get_origin(anno) is Annotated:
             _, *extras = get_args(anno)
-            for extra in extras:
-                if isinstance(extra, Depends):
-                    started = _start_dep(extra, allow_async=astack is not None)
-                    finals.append(started.final)
-                    bound.arguments[name] = started.value
+            for e in extras:
+                if isinstance(e, Depends):
+                    specs.append((name, e))
                     break
-    return finals
+    return specs
 
 
-# -------------------------------------------------------------------- #
-# 3.  Finalise helpers     (mirror ExitStack exactly)                  #
-# -------------------------------------------------------------------- #
+def _resolve_deps_sync(sig: inspect.Signature, bound: inspect.BoundArguments) -> ExitStack:
+    stack = ExitStack()
+    for name, dep in _collect_dep_specs(sig):
+        if name in bound.arguments:
+            continue
+        val = stack.enter_context(_dep_to_cm(dep))
+        bound.arguments[name] = val
+    return stack
 
 
-def _finalise_sync(finals, exc: BaseException | None) -> None:
-    for fin in reversed(finals):
-        try:
-            res = fin(exc)
-        except BaseException as new_exc:
-            exc = new_exc
-        else:
-            if exc is not None and bool(res):
-                exc = None  # swallowed
-        # continue loop with updated *exc*
-    if exc is not None:
-        raise exc
+async def _resolve_deps_async(sig: inspect.Signature, bound: inspect.BoundArguments) -> AsyncExitStack:
+    astack = AsyncExitStack()
+    await astack.enter_async_context(_AsyncDepsBinder(astack, sig, bound))
+    return astack
 
 
-async def _finalise_async(finals, exc: BaseException | None) -> None:
-    for fin in reversed(finals):
-        try:
-            res = fin(exc)
-            if isawaitable(res):
-                res = await res
-        except BaseException as new_exc:
-            exc = new_exc
-        else:
-            if exc is not None and bool(res):
-                exc = None
-    if exc is not None:
-        raise exc
+# ---- class-only resolver: plain value (no awaitables, no (a)generators)
+def _resolve_class_dep_value(dep) -> Any:
+    val = dep()  # let Depends handle persist/cache
+    if isawaitable(val) or isinstance(val, (GeneratorType, AsyncGeneratorType)):
+        raise RuntimeError("Class DI expects a plain value (no awaitables/(a)generators)")
+    return val
 
 
-# -------------------------------------------------------------------- #
-# 4.  @inject decorator implementation                                 #
-# -------------------------------------------------------------------- #
+class _AsyncDepsBinder:
+    """Helper to enter all async dep contexts under a single AsyncExitStack."""
+    def __init__(self, astack: AsyncExitStack, sig: inspect.Signature, bound: inspect.BoundArguments):
+        self.astack = astack
+        self.sig = sig
+        self.bound = bound
+
+    async def __aenter__(self):
+        for name, dep in _collect_dep_specs(self.sig):
+            if name in self.bound.arguments:
+                continue
+            val = await self.astack.enter_async_context(_dep_to_acm(dep))
+            self.bound.arguments[name] = val
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        # AsyncExitStack handles exit of all entered contexts.
+        return False
+
+
+# ---------- Decorator ----------
 @overload
 def inject(__fn: Callable[P, R]) -> Callable[P, R]: ...
-
-
 @overload
 def inject() -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 
-
 def inject(target: Callable[..., Any] | type | None = None):
-    """Decorator that *injects* :class:`Depends` parameters.
-
-    It supports
-
-    * plain sync functions
-    * coroutines
-    * generator functions (as streaming endpoints)
-    * async-generator functions
-    * classes (fields initialised at ``__init__`` time)
-
-    The decorator can be used with or without parentheses::
-
-        @inject
-        def handler(a: Annotated[int, Depends(int)]): ...
-
-        @inject()
-        async def coro(...): ...
-    """
-
-    # ---------------- inner helpers --------------------------------
     def _wrap_fn(fn: Callable[P, R]) -> Callable[P, R]:
         sig = inspect.signature(fn)
         is_coro = inspect.iscoroutinefunction(fn)
         is_gen = inspect.isgeneratorfunction(fn)
         is_async_gen = inspect.isasyncgenfunction(fn)
 
-        # —— 4.1  Plain synchronous function ------------------------
+        # Sync function
         if not (is_coro or is_gen or is_async_gen):
-
             @wraps(fn)
-            def wrapper(*args: P.args, **kw: P.kwargs):  # type: ignore[misc]
+            def wrapper(*args: P.args, **kw: P.kwargs):
                 bound = sig.bind_partial(*args, **kw)
-                with ExitStack() as stack:
-                    finals = _bind_all(sig, bound, stack=stack, astack=None)
-                    try:
-                        result = fn(**bound.arguments)  # type: ignore[arg-type]
-                    except BaseException as exc:
-                        _finalise_sync(finals, exc)
-                        return None
-                    _finalise_sync(finals, None)
-                    return result
-
+                with _resolve_deps_sync(sig, bound):
+                    return fn(**bound.arguments)  # type: ignore[arg-type]
             return wrapper  # type: ignore[return-value]
 
-        # —— 4.2  Coroutine -----------------------------------------
+        # Coroutine
         if is_coro:
-
             @wraps(fn)
-            async def wrapper(*args: P.args, **kw: P.kwargs):  # type: ignore[misc]
+            async def wrapper(*args: P.args, **kw: P.kwargs):
                 bound = sig.bind_partial(*args, **kw)
-                async with AsyncExitStack() as astack:
-                    with ExitStack() as stack:
-                        finals = _bind_all(sig, bound, stack=stack, astack=astack)
-                        # await injected coroutine values
-                        for k, v in list(bound.arguments.items()):
-                            if isawaitable(v):
-                                bound.arguments[k] = await v
-                        try:
-                            result = await fn(**bound.arguments)  # type: ignore[arg-type]
-                        except BaseException as exc:
-                            await _finalise_async(finals, exc)
-                            return None
-                        await _finalise_async(finals, None)
-                        return result
-
+                async with await _resolve_deps_async(sig, bound):
+                    return await fn(**bound.arguments)  # type: ignore[arg-type]
             return wrapper  # type: ignore[return-value]
 
-        # —— 4.3  *Sync* generator ----------------------------------
+        # Sync generator (proxy; *forward* throw into inner gen)
         if is_gen:
-
             @wraps(fn)
-            def wrapper(*args: P.args, **kw: P.kwargs):  # type: ignore[misc]
+            def wrapper(*args: P.args, **kw: P.kwargs):
                 bound = sig.bind_partial(*args, **kw)
-                with ExitStack() as stack:
-                    finals = _bind_all(sig, bound, stack=stack, astack=None)
+                with _resolve_deps_sync(sig, bound):
                     gen = fn(**bound.arguments)
                     try:
-                        first = next(gen)
-                    except StopIteration:
-                        raise RuntimeError("Generator produced no value") from None
-
-                    try:
-                        yield first
-                    except BaseException as exc:
+                        while True:
+                            try:
+                                item = next(gen)
+                            except StopIteration:
+                                break
+                            try:
+                                yield item
+                            except BaseException as thrown:
+                                try:
+                                    gen.throw(thrown)
+                                except StopIteration:
+                                    break
+                                else:
+                                    continue
+                    finally:
                         try:
-                            gen.throw(exc)
-                        except StopIteration:  # swallowed
-                            exc = None
-                        except BaseException as inner:
-                            exc = inner
-                        _finalise_sync(finals, exc)
-                    else:
-                        gen.close()
-                        _finalise_sync(finals, None)
+                            gen.close()
+                        except Exception:
+                            pass
 
             return wrapper  # type: ignore[return-value]
 
-        # —— 4.4  Async-generator -----------------------------------
-        @wraps(fn)
-        async def wrapper(*args: P.args, **kw: P.kwargs):  # type: ignore[misc]
-            bound = sig.bind_partial(*args, **kw)
-            async with AsyncExitStack() as astack:
-                with ExitStack() as stack:
-                    finals = _bind_all(sig, bound, stack=stack, astack=astack)
-                    for k, v in list(bound.arguments.items()):
-                        if isawaitable(v):
-                            bound.arguments[k] = await v
-
+        # Async generator (proxy; *forward* athrow into inner agen)
+        if is_async_gen:
+            @wraps(fn)
+            async def wrapper(*args: P.args, **kw: P.kwargs):
+                bound = sig.bind_partial(*args, **kw)
+                async with await _resolve_deps_async(sig, bound):
                     agen = fn(**bound.arguments)
-                    try:
-                        first = await agen.__anext__()
-                    except StopAsyncIteration:
-                        raise RuntimeError("Async-generator produced no value") from None
 
                     try:
-                        yield first
-                    except BaseException as exc:
+                        while True:
+                            # pull next item manually
+                            try:
+                                item = await agen.__anext__()
+                            except StopAsyncIteration:
+                                break
+
+                            # yield to caller, but forward thrown exceptions to inner agen
+                            try:
+                                yield item
+                            except BaseException as thrown:
+                                try:
+                                    await agen.athrow(thrown)
+                                except StopAsyncIteration:
+                                    # inner agen handled it and finished
+                                    break
+                                else:
+                                    # inner agen yielded a value after handling; continue loop
+                                    continue
+                    finally:
+                        # ensure the inner generator is closed if not already
                         try:
-                            await agen.athrow(exc)
-                        except StopAsyncIteration:
-                            exc = None
-                        except BaseException as inner:
-                            exc = inner
-                        await _finalise_async(finals, exc)
-                    else:
-                        await agen.aclose()
-                        await _finalise_async(finals, None)
+                            await agen.aclose()
+                        except Exception:
+                            pass
 
-        return wrapper  # type: ignore[return-value]
+            return wrapper  # type: ignore[return-value]
 
-    # ---------------- Class wrapper --------------------------------
+        return fn
+
+
     def _wrap_cls(cls: type) -> type:
         """Inject :class:`Depends` fields at construction."""
         orig_init = cls.__init__
-        is_plain = orig_init is object.__init__
+        is_plain = (orig_init is object.__init__)
+
+        # Optional: detect Pydantic BaseModel to pass kwargs instead of setattr
+        try:
+            from pydantic import BaseModel  # type: ignore
+            is_pydantic = issubclass(cls, BaseModel)  # noqa: F821
+        except Exception:
+            is_pydantic = False
 
         @wraps(orig_init)
         def __init__(self, *args, **kwargs):  # type: ignore[no-self-use]
             injected: dict[str, Any] = {}
+
             for name, anno in getattr(cls, "__annotations__", {}).items():
+                if name in kwargs:
+                    continue
                 if get_origin(anno) is Annotated:
                     _, *extras = get_args(anno)
                     for e in extras:
-                        if isinstance(e, Depends) and name not in kwargs:
-                            injected[name] = _start_dep(e, allow_async=False).value
+                        # Only resolve if not provided by caller
+                        if isinstance(e, Depends):
+                            injected[name] = _resolve_class_dep_value(e)
                             break
 
-            if is_plain:  # dataclass-like, no custom __init__
+            if is_pydantic:
+                # Pydantic must receive values via kwargs (no setattr before __init__)
+                return orig_init(self, *args, **{**injected, **kwargs})
+
+            if is_plain:
+                # object.__init__ can't take kwargs; set attributes first
                 for k, v in injected.items():
                     setattr(self, k, v)
-                orig_init(self)
-            else:
-                orig_init(self, *args, **{**injected, **kwargs})
+                return orig_init(self)
+
+            # Custom __init__: try kwargs first, fall back to setattr if signature rejects
+            try:
+                return orig_init(self, *args, **{**injected, **kwargs})
+            except TypeError:
+                for k, v in injected.items():
+                    setattr(self, k, v)
+                return orig_init(self, *args, **kwargs)
 
         cls.__init__ = __init__  # type: ignore[assignment]
         return cls
 
-    # ---------------- Dispatcher -----------------------------------
     def _apply(t):
         if inspect.isclass(t):
             return _wrap_cls(t)
