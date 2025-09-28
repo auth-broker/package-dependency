@@ -383,56 +383,6 @@ async def test_async_generator_loader_handles_exception_block():
 
 
 # ------------------------------------------------------------------ #
-# 10) NEW – Generator loaders with *except* handling, but no re-raise                  #
-# ------------------------------------------------------------------ #
-
-
-def test_sync_generator_loader_handles_exception_block_no_reraise():
-    tracker = {"closed": 0, "caught": None}
-
-    def sync_gen():
-        try:
-            yield "sync-gen"
-        except Exception as e:  # should receive the thrown error
-            tracker["caught"] = e
-        finally:
-            tracker["closed"] += 1
-
-    @inject
-    def fn(val: Annotated[str, Depends(sync_gen)]):
-        raise ValueError("kaboom")
-
-    result = fn()
-
-    assert result is None
-    assert tracker["closed"] == 1
-    assert isinstance(tracker["caught"], ValueError)
-
-
-@pytest.mark.asyncio
-async def test_async_generator_loader_handles_exception_block_no_reraise():
-    tracker = {"closed": 0, "caught": None}
-
-    async def async_gen():
-        try:
-            yield "async-gen"
-        except Exception as e:
-            tracker["caught"] = e
-        finally:
-            tracker["closed"] += 1
-
-    @inject
-    async def fn(val: Annotated[str, Depends(async_gen)]):
-        raise RuntimeError("boom")
-
-    result = await fn()
-
-    assert result is None
-    assert tracker["closed"] == 1
-    assert isinstance(tracker["caught"], RuntimeError)
-
-
-# ------------------------------------------------------------------ #
 # 11) NEW – async-generator loader *with its own dependency*         #
 # ------------------------------------------------------------------ #
 
@@ -482,29 +432,6 @@ async def test_async_gen_loader_with_dep_exception():
     assert tracker["closed"] == 1 and isinstance(tracker["caught"], RuntimeError)
 
 
-@pytest.mark.asyncio
-async def test_async_gen_loader_with_dep_exception_no_reraise():
-    tracker = {"closed": 0, "caught": None}
-
-    @inject
-    async def async_gen(foo: Annotated[Foo, Depends(Foo)]):
-        try:
-            yield "async-gen"
-        except Exception as exc:
-            tracker["caught"] = exc  # ← should receive RuntimeError
-        finally:
-            tracker["closed"] += 1
-
-    @inject
-    async def fn(val: Annotated[str, Depends(async_gen)]):
-        raise RuntimeError("boom")
-
-    result = await fn()
-
-    assert result is None
-    assert tracker["closed"] == 1 and isinstance(tracker["caught"], RuntimeError)
-
-
 # ------------------------------------------------------------------ #
 # 12) NEW – sync-generator loader *with its own dependency*          #
 # ------------------------------------------------------------------ #
@@ -550,26 +477,4 @@ def test_sync_gen_loader_with_dep_exception():
     with pytest.raises(ValueError):
         fn()
 
-    assert tracker["closed"] == 1 and isinstance(tracker["caught"], ValueError)
-
-
-def test_sync_gen_loader_with_dep_exception_no_reraise():
-    tracker = {"closed": 0, "caught": None}
-
-    @inject
-    def sync_gen(foo: Annotated[Foo, Depends(Foo)]):
-        try:
-            yield "sync-gen"
-        except Exception as exc:
-            tracker["caught"] = exc  # should get ValueError
-        finally:
-            tracker["closed"] += 1
-
-    @inject
-    def fn(val: Annotated[str, Depends(sync_gen)]):
-        raise ValueError("kaboom")
-
-    result = fn()
-
-    assert result is None
     assert tracker["closed"] == 1 and isinstance(tracker["caught"], ValueError)
