@@ -1,11 +1,12 @@
 # ab_core/dependency/inject.py
 
 import inspect
-from contextlib import ExitStack, AsyncExitStack, contextmanager, asynccontextmanager
+from collections.abc import Callable
+from contextlib import AsyncExitStack, ExitStack, asynccontextmanager, contextmanager
 from functools import wraps
 from inspect import isawaitable
-from types import GeneratorType, AsyncGeneratorType
-from typing import Annotated, Any, Awaitable, Callable, ParamSpec, TypeVar, get_args, get_origin, overload
+from types import AsyncGeneratorType, GeneratorType
+from typing import Annotated, Any, ParamSpec, TypeVar, get_args, get_origin, overload
 
 from .depends import Depends
 
@@ -150,6 +151,7 @@ def _resolve_class_dep_value(dep) -> Any:
 
 class _AsyncDepsBinder:
     """Helper to enter all async dep contexts under a single AsyncExitStack."""
+
     def __init__(self, astack: AsyncExitStack, sig: inspect.Signature, bound: inspect.BoundArguments):
         self.astack = astack
         self.sig = sig
@@ -174,6 +176,7 @@ def inject(__fn: Callable[P, R]) -> Callable[P, R]: ...
 @overload
 def inject() -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 
+
 def inject(target: Callable[..., Any] | type | None = None):
     def _wrap_fn(fn: Callable[P, R]) -> Callable[P, R]:
         sig = inspect.signature(fn)
@@ -183,24 +186,29 @@ def inject(target: Callable[..., Any] | type | None = None):
 
         # Sync function
         if not (is_coro or is_gen or is_async_gen):
+
             @wraps(fn)
             def wrapper(*args: P.args, **kw: P.kwargs):
                 bound = sig.bind_partial(*args, **kw)
                 with _resolve_deps_sync(sig, bound):
                     return fn(**bound.arguments)  # type: ignore[arg-type]
+
             return wrapper  # type: ignore[return-value]
 
         # Coroutine
         if is_coro:
+
             @wraps(fn)
             async def wrapper(*args: P.args, **kw: P.kwargs):
                 bound = sig.bind_partial(*args, **kw)
                 async with await _resolve_deps_async(sig, bound):
                     return await fn(**bound.arguments)  # type: ignore[arg-type]
+
             return wrapper  # type: ignore[return-value]
 
         # Sync generator (proxy; *forward* throw into inner gen)
         if is_gen:
+
             @wraps(fn)
             def wrapper(*args: P.args, **kw: P.kwargs):
                 bound = sig.bind_partial(*args, **kw)
@@ -231,6 +239,7 @@ def inject(target: Callable[..., Any] | type | None = None):
 
         # Async generator (proxy; *forward* athrow into inner agen)
         if is_async_gen:
+
             @wraps(fn)
             async def wrapper(*args: P.args, **kw: P.kwargs):
                 bound = sig.bind_partial(*args, **kw)
@@ -268,15 +277,15 @@ def inject(target: Callable[..., Any] | type | None = None):
 
         return fn
 
-
     def _wrap_cls(cls: type) -> type:
         """Inject :class:`Depends` fields at construction."""
         orig_init = cls.__init__
-        is_plain = (orig_init is object.__init__)
+        is_plain = orig_init is object.__init__
 
         # Optional: detect Pydantic BaseModel to pass kwargs instead of setattr
         try:
             from pydantic import BaseModel  # type: ignore
+
             is_pydantic = issubclass(cls, BaseModel)  # noqa: F821
         except Exception:
             is_pydantic = False

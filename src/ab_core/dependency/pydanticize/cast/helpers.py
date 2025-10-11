@@ -5,7 +5,7 @@ from collections.abc import Callable
 from functools import cache
 from typing import ParamSpec, TypeVar, cast
 
-from pydantic import TypeAdapter, BaseModel
+from pydantic import TypeAdapter
 
 from .adaptors.attrs import HAS_ATTRS, AttrsPlugin
 from .adaptors.base import BaseTypePlugin
@@ -17,6 +17,7 @@ R = TypeVar("R")
 
 def typed_cache(func: Callable[P, R]) -> Callable[P, R]:
     return cast(Callable[P, R], cache(func))
+
 
 PLUGINS: list[BaseTypePlugin] = []
 if HAS_ATTRS:
