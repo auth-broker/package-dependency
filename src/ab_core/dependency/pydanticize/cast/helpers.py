@@ -8,6 +8,7 @@ from typing import ParamSpec, TypeVar, cast
 from pydantic import TypeAdapter
 
 from .adaptors.attrs import HAS_ATTRS, AttrsPlugin
+from .adaptors.unset import UnsetStripPlugin
 from .adaptors.base import BaseTypePlugin
 
 # ---------- typed cache wrapper ----------
@@ -22,6 +23,9 @@ def typed_cache(func: Callable[P, R]) -> Callable[P, R]:
 PLUGINS: list[BaseTypePlugin] = []
 if HAS_ATTRS:
     PLUGINS.append(AttrsPlugin())
+    # This UnsetStripPlugin is a patch for ab_client 'Unset' types, which are not
+    # supported by pydantic
+    PLUGINS.append(UnsetStripPlugin())
 
 
 def lookup_plugin(obj: object) -> BaseTypePlugin | None:
