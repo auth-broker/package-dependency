@@ -4,7 +4,7 @@ SHELL := /bin/bash
 
 .PHONY: install ## install required dependencies on bare metal
 install:
-	uv sync --extra all
+	uv sync --extra all --refresh
 
 
 .PHONY: format ## Run the formatter on bare metal
