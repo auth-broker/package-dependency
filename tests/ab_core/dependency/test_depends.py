@@ -83,11 +83,11 @@ LOAD_TARGETS = [
     # discriminated union of attrs classes
     FooBarAttrs,
     # attrs classes themselves
-    FooAttrs,
-    BarAttrs,
+    pydanticize_type(FooAttrs),
+    pydanticize_type(BarAttrs),
     # environment loaders targeting attrs classes
-    ObjectLoaderEnvironment[FooAttrs](),
-    ObjectLoaderEnvironment[BarAttrs](),
+    ObjectLoaderEnvironment[pydanticize_type(FooAttrs)](),
+    ObjectLoaderEnvironment[pydanticize_type(BarAttrs)](),
     foo,
     bar,
     FooClass,
