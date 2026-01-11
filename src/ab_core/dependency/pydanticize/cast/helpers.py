@@ -8,8 +8,8 @@ from typing import ParamSpec, TypeVar, cast
 from pydantic import TypeAdapter
 
 from .adaptors.attrs import HAS_ATTRS, AttrsPlugin
-from .adaptors.unset import UnsetStripPlugin
 from .adaptors.base import BaseTypePlugin
+from .adaptors.unset import UnsetStripPlugin
 
 # ---------- typed cache wrapper ----------
 P = ParamSpec("P")
