@@ -1,3 +1,5 @@
+"""Default dependency loader selection."""
+
 from .loaders import Loader, ObjectLoaderEnvironment
 from .schema.loader_type import LoaderSource
 

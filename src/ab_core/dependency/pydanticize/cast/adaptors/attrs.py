@@ -23,8 +23,13 @@ try:
     )
 except ImportError:
     HAS_ATTRS = False
-    _has = lambda _: False
-    _fields = lambda _: []
+
+    def _has(_: object) -> bool:
+        return False
+
+    def _fields(_: object) -> list[Any]:
+        return []
+
     _NOTHING = object()
 
 if TYPE_CHECKING:
@@ -148,9 +153,7 @@ class AttrsPlugin(BaseTypePlugin):
 
         def _is_descriptor(obj: object) -> bool:
             # property / classmethod / staticmethod / cached_property
-            return (
-                isinstance(obj, (property, classmethod, staticmethod)) or isinstance(obj, _cached_property)  # type: ignore[arg-type]
-            )
+            return isinstance(obj, property | classmethod | staticmethod) or isinstance(obj, _cached_property)  # type: ignore[arg-type]
 
         # Explicitly allow the 4 context-manager dunders (fixes async CM support)
         _ALLOWED_DUNDERS = {"__enter__", "__exit__", "__aenter__", "__aexit__"}

@@ -1,32 +1,32 @@
-"""Universal object loader / dependency‑provider
+"""Universal object loader and dependency provider.
 
 Supports three kinds of *load targets*:
 
-1. **LoaderBase** subclasses – your concrete Loader classes.  These are
+1. **LoaderBase** subclasses - your concrete Loader classes. These are
    already callable and encapsulate loading logic.
-2. **Raw Python types** – automatically wrapped in `DefaultLoader` so you
+2. **Raw Python types** - automatically wrapped in `DefaultLoader` so you
    can write::
 
        foo: Foo = Field(default=Depends(Foo))
 
 3. **Arbitrary callables** (functions, generator functions, async
-   functions, async‑generator functions).  These are executed in a way
-   that mirrors FastAPI’s dependency behaviour:
-   * generator → first ``yield``
-   * async‑generator → first ``yield`` (returned as awaitable)
-   * coroutine       → coroutine object (caller awaits)
-   * plain function  → return value
+    functions, async-generator functions). These are executed in a way
+    that mirrors FastAPI dependency behavior:
+    * generator -> first ``yield``
+    * async-generator -> first ``yield`` (returned as awaitable)
+    * coroutine -> coroutine object (caller awaits)
+    * plain function -> return value
 
-There are two public entry‑points:
+There are two public entry points:
 
-* :func:`Load`   – synchronous façade (blocks if passed an awaitable)
-* :func:`aLoad`  – asynchronous façade (always ``await``‑safe)
+* :func:`Load` - synchronous facade (blocks if passed an awaitable)
+* :func:`aLoad` - asynchronous facade (always ``await``-safe)
 
 Both share a single private implementation, so maintenance cost is low.
 """
 
 from collections.abc import Awaitable
-from typing import Generic, TypeVar, Union
+from typing import TypeVar
 
 from .loaders.base import LoaderBase
 from .singleton import SingletonRegistry
@@ -35,7 +35,10 @@ from .utils import is_real_callable
 
 
 class NullDepends:
-    def __init__(self, *args, **kwargs): ...
+    """Fallback stand-in when FastAPI is not installed."""
+
+    def __init__(self, *args, **kwargs):
+        """Store constructor compatibility with FastAPI Depends."""
 
 
 # ------------------------------------------------------------------ #
@@ -47,14 +50,14 @@ except ModuleNotFoundError:  # running without FastAPI
     _FastapiDepends = NullDepends  # type: ignore[assignment,misc]
 
 T = TypeVar("T")
-Ret = Union[T, Awaitable[T]]
+Ret = T | Awaitable[T]
 
 # --------------------------------------------------------------------- #
 # Core implementation (sync; never awaits)                              #
 # --------------------------------------------------------------------- #
 
 
-def _load_impl(load_target: LoadTarget[T], *, persist: bool) -> T:  # noqa: C901
+def _load_impl[T](load_target: LoadTarget[T], *, persist: bool) -> T:  # noqa: C901
     """Return either *T* or an *Awaitable[T]* depending on target nature."""
     from .default import DefaultLoader  # local import to avoid cycle
 
@@ -82,18 +85,17 @@ def _load_impl(load_target: LoadTarget[T], *, persist: bool) -> T:  # noqa: C901
     )
 
 
-def Load(load_target: LoadTarget[T], *, persist: bool = False) -> T:  # type: ignore[override]  # noqa: ANN001, D401
+def Load[T](load_target: LoadTarget[T], *, persist: bool = False) -> T:  # type: ignore[override]  # noqa: D401
     """Load **synchronously**.
 
     If the underlying target is asynchronous, the current thread will
-    block until the awaitable completes (using :pyfunc:`asyncio.run` or
-    the running event‑loop’s ``run_until_complete``).
+    block until the awaitable completes.
     """
     return _load_impl(load_target, persist=persist)
 
 
-class Depends(Generic[T], _FastapiDepends):
-    """Factory for dependency‑injection annotations.
+class Depends[T](_FastapiDepends):
+    """Factory for dependency-injection annotations.
 
     Example::
 
@@ -107,13 +109,15 @@ class Depends(Generic[T], _FastapiDepends):
         *,
         persist: bool = False,
     ) -> None:
+        """Create a dependency wrapper for a target loader or callable."""
         super().__init__(dependency=self.__call__, use_cache=persist)  # type: ignore[misc]
 
         self.load_target = type_or_loader
         self.persist = persist
 
     # The provider is designed to be called *by* the DI system, not by
-    # user code.  It uses the synchronous façade because FastAPI will
+    # user code. It uses the synchronous facade because FastAPI will
     # `await` if it receives a coroutine.
     def __call__(self) -> T:  # noqa: D401
+        """Resolve the wrapped dependency target."""
         return Load(self.load_target, persist=self.persist)

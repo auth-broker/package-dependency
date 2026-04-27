@@ -1,3 +1,5 @@
+"""Reshape environment-derived payloads to match Pydantic core schemas."""
+
 import json
 from typing import Any
 
@@ -10,7 +12,9 @@ def _clean_field(
     *,
     key_delim: str = "_",
 ) -> None:
-    """Remove the branch specified by `field_path`. After deleting the leaf,
+    """Remove the branch specified by `field_path`.
+
+    After deleting the leaf,
     recursively delete any parent keys that become empty dictionaries.
 
     Parameters
@@ -111,6 +115,7 @@ def pydanticize_model_fields(
     *,
     definition_map: dict | None = None,
 ) -> dict[str, Any]:
+    """Transform all model fields according to their child schemas."""
     fields = schema["fields"]
     for field_name, field_schema in fields.items():
         _align_field(obj, field_name)
@@ -133,6 +138,7 @@ def pydanticize_model_field(
     *,
     definition_map: dict | None = None,
 ) -> dict[str, Any] | Any:
+    """Transform a single model field using its nested schema."""
     inner_schema = schema.get("schema")
 
     if obj is not None and inner_schema is not None:
@@ -151,6 +157,7 @@ def pydanticize_list(
     *,
     definition_map: dict | None = None,
 ) -> list[Any]:
+    """Normalize list-shaped input and transform each list item."""
     if isinstance(obj, str):
         obj = json.loads(obj)
 
@@ -175,6 +182,7 @@ def pydanticize_tagged_union(
     *,
     definition_map: dict | None = None,
 ) -> dict[str, Any]:
+    """Flatten tagged-union payloads into the selected branch schema."""
     discriminator = schema["discriminator"]
     discriminator_choice = obj[discriminator]
     if not isinstance(discriminator_choice, str):
@@ -212,6 +220,7 @@ def pydanticize_definitions(
     *,
     definition_map: dict | None = None,
 ) -> dict[str, Any]:
+    """Build a definition lookup map and continue with the root schema."""
     if definition_map is None:
         definition_map = {}
     definitions = schema["definitions"]
@@ -231,6 +240,7 @@ def pydanticize_definition_ref(
     *,
     definition_map: dict | None = None,
 ) -> dict[str, Any]:
+    """Resolve a definition-ref schema and transform data against it."""
     schema_ref = schema["schema_ref"]
     schema = definition_map[schema_ref]
     return pydanticize_data(
@@ -246,6 +256,7 @@ def pydanticize_child_schema(
     *,
     definition_map: dict | None = None,
 ) -> dict[str, Any]:
+    """Transform data using a nested `schema` member."""
     field_schema = schema["schema"]
     return pydanticize_data(
         obj,
@@ -260,6 +271,7 @@ def pydanticize_data(
     *,
     definition_map: dict | None = None,
 ) -> dict[str, Any]:
+    """Dispatch transformation based on core schema type metadata."""
     if definition_map is None:
         definition_map = {}
 

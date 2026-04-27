@@ -1,3 +1,5 @@
+"""Environment-backed scalar loader implementation."""
+
 import os
 from typing import Any, Literal, override
 
@@ -7,9 +9,10 @@ from .base import LoaderBase, T
 
 
 class LoaderEnvironment(LoaderBase[T]):
-    """A loader that picks a subtype of a Discriminated Union
-    from an env-var PREFIX_type, then scans PREFIX_type_{value}_{field}
-    for every other field on that subtype.
+    """Load a value directly from an environment variable.
+
+    The configured key is read verbatim and then parsed by Pydantic
+    against the target type.
     """
 
     # These get pulled from env or you can override in code:
@@ -21,7 +24,5 @@ class LoaderEnvironment(LoaderBase[T]):
     def load_raw(
         self,
     ) -> Any:
-        """Collects environment variables to build a dict matching the discriminated union fields,
-        keyed by discriminator and field names, ready for Pydantic validation.
-        """
+        """Return the raw string value from the configured environment key."""
         return os.getenv(self.key)

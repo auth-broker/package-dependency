@@ -1,3 +1,5 @@
+"""Utility helpers for dependency loading and environment parsing."""
+
 import inspect
 import os
 import re
@@ -6,6 +8,7 @@ from typing import get_args
 
 
 def str_intersection(*args: str) -> str:
+    """Return the longest common substring across all provided strings."""
     if not args:
         return ""
 
@@ -22,11 +25,13 @@ def str_intersection(*args: str) -> str:
 
 
 def type_name_intersection(types: tuple[type, ...]) -> str:
+    """Return the longest shared substring among type names."""
     return str_intersection(*(t.__name__ for t in types))
 
 
 def to_env_prefix(name: str) -> str:
-    """Convert CamelCase or PascalCase to ENV_VAR_STYLE (uppercase with underscores).
+    """Convert CamelCase or PascalCase to ENV_VAR_STYLE.
+
     E.g. 'OAuth2TokenStore' -> 'OAUTH2_TOKEN_STORE'
     """
     s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
@@ -35,12 +40,14 @@ def to_env_prefix(name: str) -> str:
 
 
 def insert_nested(dct, keys, value):
+    """Insert a value into a nested dictionary using a key path."""
     for key in keys[:-1]:
         dct = dct.setdefault(key.lower(), {})
     dct[keys[-1].lower()] = value
 
 
 def apply_suffix(key: str, suffix: str):
+    """Append `suffix` to `key` when not already present."""
     if not key.endswith(suffix):
         return key + suffix
     return key
@@ -50,6 +57,7 @@ def extract_discriminator_from_env(
     prefix: str,
     discriminator_key: str,
 ):
+    """Read a discriminator value from the environment for a prefix."""
     prefix_with_ = apply_suffix(prefix, "_")
     discriminator_env_key = f"{prefix_with_}{discriminator_key.upper()}"
     discriminator_value = os.environ.get(discriminator_env_key)
@@ -58,6 +66,8 @@ def extract_discriminator_from_env(
 
 
 def extract_env_tree(env: dict[str, str], prefix: str) -> dict:
+    """Extract prefixed environment variables into a nested dictionary."""
+
     def insert_recursive(current: dict, keys: list[str], value: str):
         key = keys[0].lower()
 
@@ -90,6 +100,8 @@ def extract_env_tree(env: dict[str, str], prefix: str) -> dict:
 
 
 def walk_types_args(t_base: type):
+    """Yield a type and every nested argument type recursively."""
+
     def walk(t):
         yield t
 
@@ -102,15 +114,17 @@ def walk_types_args(t_base: type):
 
 
 def extract_target_types(obj: type, target_type: type) -> Iterator[type | object]:
+    """Yield nested types that match or subclass `target_type`."""
     for t in walk_types_args(obj):
         if isinstance(t, target_type) or isinstance(t, type) and issubclass(t, target_type):
             yield t
 
 
 def is_real_callable(obj) -> bool:
-    """True for user code we actually want to execute as a loader.
-    False for typing constructs (Union, Annotated, etc.) that merely
-    *happen* to be callable.
+    """Return whether an object is executable user loader code.
+
+    Typing constructs like `Union` or `Annotated` are intentionally
+    excluded even when they appear callable.
     """
     # 1. Plain Python function / lambda / bound method.
     if inspect.isfunction(obj) or inspect.ismethod(obj):

@@ -1,3 +1,5 @@
+"""Common typing aliases for dependency loading."""
+
 from collections.abc import Callable
 from typing import (
     Annotated,
