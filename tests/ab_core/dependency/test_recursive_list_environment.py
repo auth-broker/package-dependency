@@ -77,7 +77,7 @@ def test_list_of_primitives_supports_indexed_env_form():
     assert result == SimpleListObject(list_field=["A", "B", "C", "D"])
 
 
-def test_list_json_form_takes_precedence_over_indexed_form_for_backwards_compatibility():
+def test_list_json_form_conflicts_with_indexed_form():
     with patch.dict(
         os.environ,
         {
@@ -87,9 +87,8 @@ def test_list_json_form_takes_precedence_over_indexed_form_for_backwards_compati
         },
         clear=False,
     ):
-        result = Load(SimpleListObject, persist=False)
-
-    assert result == SimpleListObject(list_field=["JSON_A", "JSON_B"])
+        with pytest.raises(RuntimeError, match="Environment variable collision"):
+            Load(SimpleListObject, persist=False)
 
 
 def test_list_of_discriminated_models_supports_indexed_env_form():

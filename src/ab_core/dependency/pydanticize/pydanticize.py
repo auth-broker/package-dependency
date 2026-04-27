@@ -148,7 +148,7 @@ def pydanticize_model_field(
 
 
 def pydanticize_list(
-    obj: list[Any] | dict[str, Any] | str,
+    obj: list[Any] | dict[str, Any] | str | Any,
     schema: CoreSchema,
     *,
     definition_map: dict | None = None,
@@ -257,7 +257,7 @@ def pydanticize_child_schema(
 
 
 def pydanticize_data(
-    obj: dict[str, Any] | Any,
+    obj: list[Any] | dict[str, Any] | str | Any,
     core_schema: CoreSchema,
     *,
     definition_map: dict | None = None,

@@ -60,12 +60,24 @@ def extract_discriminator_from_env(
 def extract_env_tree(env: dict[str, str], prefix: str) -> dict:
     def insert_recursive(current: dict, keys: list[str], value: str):
         key = keys[0].lower()
+
         if len(keys) == 1:
+            if key in current and isinstance(current[key], dict):
+                raise ValueError(
+                    f"Environment variable collision: key {key!r} is already defined as an object."
+                )
             current[key] = value
-        else:
-            if key not in current or not isinstance(current[key], dict):
-                current[key] = {}
-            insert_recursive(current[key], keys[1:], value)
+            return
+
+        if key in current and not isinstance(current[key], dict):
+            raise ValueError(
+                f"Environment variable collision: key {key!r} is already defined as a value."
+            )
+
+        if key not in current:
+            current[key] = {}
+
+        insert_recursive(current[key], keys[1:], value)
 
     result = {}
 
