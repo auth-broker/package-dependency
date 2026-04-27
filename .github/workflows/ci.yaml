@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Install uv + Python (with cache)
       - name: Install uv
@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 5
     # Run in parallel with lint (remove this 'needs' to keep parallel; add needs: [lint] to serialize)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
