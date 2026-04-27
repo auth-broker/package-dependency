@@ -63,16 +63,12 @@ def extract_env_tree(env: dict[str, str], prefix: str) -> dict:
 
         if len(keys) == 1:
             if key in current and isinstance(current[key], dict):
-                raise ValueError(
-                    f"Environment variable collision: key {key!r} is already defined as an object."
-                )
+                raise ValueError(f"Environment variable collision: key {key!r} is already defined as an object.")
             current[key] = value
             return
 
         if key in current and not isinstance(current[key], dict):
-            raise ValueError(
-                f"Environment variable collision: key {key!r} is already defined as a value."
-            )
+            raise ValueError(f"Environment variable collision: key {key!r} is already defined as a value.")
 
         if key not in current:
             current[key] = {}

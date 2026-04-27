@@ -100,9 +100,7 @@ def _normalise_indexed_list(obj: dict[str, Any]) -> list[Any]:
     indexes = sorted(int(key) for key in obj)
 
     if indexes != list(range(len(indexes))):
-        raise ValueError(
-            f"Sparse list indexes are not supported. Expected contiguous indexes from 0, got {indexes}."
-        )
+        raise ValueError(f"Sparse list indexes are not supported. Expected contiguous indexes from 0, got {indexes}.")
 
     return [obj[str(index)] for index in indexes]
 
