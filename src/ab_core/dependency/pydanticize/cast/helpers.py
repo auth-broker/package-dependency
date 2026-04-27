@@ -16,7 +16,8 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def typed_cache(func: Callable[P, R]) -> Callable[P, R]:
+def typed_cache[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    """Wrap functools.cache while preserving callable type information."""
     return cast(Callable[P, R], cache(func))
 
 

@@ -1,3 +1,5 @@
+"""Environment-backed object loader implementation."""
+
 import os
 from typing import Any, Literal, override
 
@@ -10,9 +12,10 @@ from .base import ObjectLoaderBase, T
 
 
 class ObjectLoaderEnvironment(ObjectLoaderBase[T]):
-    """A loader that picks a subtype of a Discriminated Union
-    from an env-var PREFIX_type, then scans PREFIX_type_{value}_{field}
-    for every other field on that subtype.
+    """Load structured objects from environment variables.
+
+    Data is collected using a configurable prefix and reshaped to match
+    the target model schema.
     """
 
     # These get pulled from env or you can override in code:
@@ -22,6 +25,7 @@ class ObjectLoaderEnvironment(ObjectLoaderBase[T]):
 
     @model_validator(mode="after")
     def default_env_prefix(self):
+        """Populate a default prefix from the inferred alias name."""
         if self.env_prefix is None:
             self.env_prefix = to_env_prefix(self.alias_name)
         return self
@@ -30,9 +34,7 @@ class ObjectLoaderEnvironment(ObjectLoaderBase[T]):
     def load_raw(
         self,
     ) -> dict[str, Any]:
-        """Collects environment variables to build a dict matching the discriminated union fields,
-        keyed by discriminator and field names, ready for Pydantic validation.
-        """
+        """Build a nested dictionary from environment keys for model parsing."""
         tree = extract_env_tree(
             os.environ,
             self.env_prefix,

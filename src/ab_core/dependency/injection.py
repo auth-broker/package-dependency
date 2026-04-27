@@ -1,4 +1,4 @@
-# ab_core/dependency/inject.py
+"""Dependency injection decorator and runtime helpers."""
 
 import inspect
 from collections.abc import Callable
@@ -154,7 +154,7 @@ async def _resolve_deps_async(sig: inspect.Signature, bound: inspect.BoundArgume
 # ---- class-only resolver: plain value (no awaitables, no (a)generators)
 def _resolve_class_dep_value(dep) -> Any:
     val = dep()  # let Depends handle persist/cache
-    if isawaitable(val) or isinstance(val, (GeneratorType, AsyncGeneratorType)):
+    if isawaitable(val) or isinstance(val, GeneratorType | AsyncGeneratorType):
         raise RuntimeError("Class DI expects a plain value (no awaitables/(a)generators)")
     return val
 
@@ -182,12 +182,14 @@ class _AsyncDepsBinder:
 
 # ---------- Decorator ----------
 @overload
-def inject(__fn: Callable[P, R]) -> Callable[P, R]: ...
+def inject[**P, R](__fn: Callable[P, R]) -> Callable[P, R]: ...
 @overload
-def inject() -> Callable[[Callable[P, R]], Callable[P, R]]: ...
+def inject[**P, R]() -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 
 
 def inject(target: Callable[..., Any] | type | None = None):
+    """Decorate a function or class to resolve Annotated Depends values."""
+
     def _wrap_fn(fn: Callable[P, R]) -> Callable[P, R]:
         sig = inspect.signature(fn)
         is_coro = inspect.iscoroutinefunction(fn)

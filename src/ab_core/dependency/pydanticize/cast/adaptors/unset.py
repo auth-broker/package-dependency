@@ -16,12 +16,16 @@ def _is_unset(t: Any) -> bool:
 
 
 class UnsetStripPlugin(BaseTypePlugin):
+    """Strip Unset from union types before pydantic casting."""
+
     @staticmethod
     def available() -> bool:
+        """Return whether this plugin can be used."""
         # No external deps — always available.
         return True
 
     def matches(self, obj: Any) -> bool:
+        """Return whether the target includes an Unset member in a union."""
         origin = get_origin(obj)
         if origin is Union or origin is UnionType:
             return any(_is_unset(arg) for arg in get_args(obj))
@@ -45,7 +49,9 @@ class UnsetStripPlugin(BaseTypePlugin):
         elif len(args) == 1:
             cleaned = args[0]
         else:
-            # Rebuild a typing.Union without Unset
-            cleaned = Union[tuple(args)]  # type: ignore[arg-type]
+            # Rebuild a union without Unset.
+            cleaned = args[0]
+            for next_arg in args[1:]:
+                cleaned = cleaned | next_arg
 
         return pydanticize_type(cleaned)

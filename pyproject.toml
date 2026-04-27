@@ -77,3 +77,6 @@ select = [
   "UP", # pyupgrade
   "W" # pycodestyle warnings
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D", "ARG001", "B008"]

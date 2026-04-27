@@ -1,3 +1,5 @@
+"""Typed sentinel helper for dependency-injection defaults."""
+
 from typing import TypeVar, cast
 
 _T = TypeVar("_T")

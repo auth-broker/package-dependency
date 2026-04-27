@@ -1,4 +1,6 @@
-from typing import Annotated, Union
+"""Loader type exports and tagged union helpers."""
+
+from typing import Annotated
 
 from pydantic import Discriminator
 
