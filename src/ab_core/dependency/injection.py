@@ -56,59 +56,69 @@ def _dep_to_cm(dep: Depends):
 @asynccontextmanager
 async def _dep_to_acm(dep: Depends):
     obj = dep()
+
     # async generator dep
     if isinstance(obj, AsyncGeneratorType):
         try:
             val = await obj.__anext__()
-            yield val
-            # normal completion: drive teardown path without GeneratorExit
-            try:
-                await obj.asend(None)
-            except StopAsyncIteration:
-                pass
-        except BaseException as exc:
-            try:
-                await obj.athrow(exc)
-            except StopAsyncIteration:
-                pass
-            raise
-        return
 
-    # sync generator dep (lift into async by using the sync CM inside)
-    if isinstance(obj, GeneratorType):
-        with _dep_to_cm(lambda: obj):  # reuse sync wrapper
-            # re-call dep() would recreate the gen; wrap the *object* instead
-            # so we need a lambda that returns the same generator object
-            # NOTE: since we already have `obj` (the generator), this works.
-            val = next(obj)  # consume here to get the value
             try:
                 yield val
+            except BaseException as exc:
+                try:
+                    await obj.athrow(type(exc), exc, exc.__traceback__)
+                except StopAsyncIteration:
+                    pass
+                raise
+            else:
+                try:
+                    await obj.asend(None)
+                except StopAsyncIteration:
+                    pass
+
+        finally:
+            try:
+                await obj.aclose()
+            except Exception:
+                pass
+
+        return
+
+    # sync generator dep, lifted into async context
+    if isinstance(obj, GeneratorType):
+        try:
+            val = next(obj)
+
+            try:
+                yield val
+            except BaseException as exc:
+                try:
+                    obj.throw(type(exc), exc, exc.__traceback__)
+                except StopIteration:
+                    pass
+                raise
+            else:
                 try:
                     obj.send(None)
                 except StopIteration:
                     pass
-            except BaseException as exc:
-                try:
-                    obj.throw(exc)
-                except StopIteration:
-                    pass
-                raise
+
+        finally:
+            try:
+                obj.close()
+            except Exception:
+                pass
+
         return
 
     # awaitable → value
     if isawaitable(obj):
         val = await obj  # type: ignore[func-returns-value]
-        try:
-            yield val
-        finally:
-            pass
+        yield val
         return
 
     # plain value
-    try:
-        yield obj
-    finally:
-        pass
+    yield obj
 
 
 # ---------- Resolve & enter all dependencies ----------

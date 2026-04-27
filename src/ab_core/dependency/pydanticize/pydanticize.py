@@ -3,8 +3,6 @@ from typing import Any
 
 from pydantic_core.core_schema import CoreSchema
 
-COMPLEX_SCHEMA_TYPES = {"list"}
-
 
 def _clean_field(
     obj: dict[str, Any],
@@ -98,20 +96,13 @@ def _align_field(
     obj[field_name] = next_value
 
 
-def _get_base_schema(schema: CoreSchema):
-    while "schema" in schema:
-        schema = schema["schema"]
-    return schema
+def _normalise_indexed_list(obj: dict[str, Any]) -> list[Any]:
+    indexes = sorted(int(key) for key in obj)
 
+    if indexes != list(range(len(indexes))):
+        raise ValueError(f"Sparse list indexes are not supported. Expected contiguous indexes from 0, got {indexes}.")
 
-def _is_complex_schema(schema: CoreSchema) -> bool:
-    base_schema = _get_base_schema(schema)
-    base_schema_type = base_schema["type"]
-    return base_schema_type in COMPLEX_SCHEMA_TYPES
-
-
-def _decode_complex_value(value: Any):
-    return json.loads(value)
+    return [obj[str(index)] for index in indexes]
 
 
 def pydanticize_model_fields(
@@ -119,7 +110,6 @@ def pydanticize_model_fields(
     schema: CoreSchema,
     *,
     definition_map: dict | None = None,
-    decode_complex_values: bool = True,
 ) -> dict[str, Any]:
     fields = schema["fields"]
     for field_name, field_schema in fields.items():
@@ -132,7 +122,6 @@ def pydanticize_model_fields(
             obj.pop(field_name),
             field_schema,
             definition_map=definition_map,
-            decode_complex_values=decode_complex_values,
         )
 
     return obj
@@ -143,20 +132,41 @@ def pydanticize_model_field(
     schema: CoreSchema,
     *,
     definition_map: dict | None = None,
-    decode_complex_values: bool = True,
 ) -> dict[str, Any] | Any:
-    if decode_complex_values and _is_complex_schema(schema):
-        return _decode_complex_value(obj)
+    inner_schema = schema.get("schema")
 
-    if obj is not None and "schema" in schema:
+    if obj is not None and inner_schema is not None:
         return pydanticize_data(
             obj,
-            schema["schema"],
+            inner_schema,
             definition_map=definition_map,
-            decode_complex_values=decode_complex_values,
         )
 
     return obj
+
+
+def pydanticize_list(
+    obj: list[Any] | dict[str, Any] | str | Any,
+    schema: CoreSchema,
+    *,
+    definition_map: dict | None = None,
+) -> list[Any]:
+    if isinstance(obj, str):
+        obj = json.loads(obj)
+
+    if isinstance(obj, dict):
+        obj = _normalise_indexed_list(obj)
+
+    item_schema = schema["items_schema"]
+
+    return [
+        pydanticize_data(
+            item,
+            item_schema,
+            definition_map=definition_map,
+        )
+        for item in obj
+    ]
 
 
 def pydanticize_tagged_union(
@@ -164,7 +174,6 @@ def pydanticize_tagged_union(
     schema: CoreSchema,
     *,
     definition_map: dict | None = None,
-    decode_complex_values: bool = True,
 ) -> dict[str, Any]:
     discriminator = schema["discriminator"]
     discriminator_choice = obj[discriminator]
@@ -191,7 +200,6 @@ def pydanticize_tagged_union(
             discriminator_values,
             discriminator_choice_schema,
             definition_map=definition_map,
-            decode_complex_values=decode_complex_values,
         )
         return obj | pydanticized_body
 
@@ -203,7 +211,6 @@ def pydanticize_definitions(
     schema: CoreSchema,
     *,
     definition_map: dict | None = None,
-    decode_complex_values: bool = True,
 ) -> dict[str, Any]:
     if definition_map is None:
         definition_map = {}
@@ -215,7 +222,6 @@ def pydanticize_definitions(
         obj,
         schema["schema"],
         definition_map=definition_map,
-        decode_complex_values=decode_complex_values,
     )
 
 
@@ -224,7 +230,6 @@ def pydanticize_definition_ref(
     schema: CoreSchema,
     *,
     definition_map: dict | None = None,
-    decode_complex_values: bool = True,
 ) -> dict[str, Any]:
     schema_ref = schema["schema_ref"]
     schema = definition_map[schema_ref]
@@ -232,7 +237,6 @@ def pydanticize_definition_ref(
         obj,
         schema,
         definition_map=definition_map,
-        decode_complex_values=decode_complex_values,
     )
 
 
@@ -241,23 +245,20 @@ def pydanticize_child_schema(
     schema: CoreSchema,
     *,
     definition_map: dict | None = None,
-    decode_complex_values: bool = True,
 ) -> dict[str, Any]:
     field_schema = schema["schema"]
     return pydanticize_data(
         obj,
         field_schema,
         definition_map=definition_map,
-        decode_complex_values=decode_complex_values,
     )
 
 
 def pydanticize_data(
-    obj: dict[str, Any] | Any,
+    obj: list[Any] | dict[str, Any] | str | Any,
     core_schema: CoreSchema,
     *,
     definition_map: dict | None = None,
-    decode_complex_values: bool = True,
 ) -> dict[str, Any]:
     if definition_map is None:
         definition_map = {}
@@ -270,35 +271,36 @@ def pydanticize_data(
                 obj,
                 core_schema,
                 definition_map=definition_map,
-                decode_complex_values=decode_complex_values,
             )
         if type == "model-fields":
             return pydanticize_model_fields(
                 obj,
                 core_schema,
                 definition_map=definition_map,
-                decode_complex_values=decode_complex_values,
+            )
+        if type == "list":
+            return pydanticize_list(
+                obj,
+                core_schema,
+                definition_map=definition_map,
             )
         if type == "tagged-union":
             return pydanticize_tagged_union(
                 obj,
                 core_schema,
                 definition_map=definition_map,
-                decode_complex_values=decode_complex_values,
             )
         if type == "definition-ref":
             return pydanticize_definition_ref(
                 obj,
                 core_schema,
                 definition_map=definition_map,
-                decode_complex_values=decode_complex_values,
             )
         if type == "definitions":
             return pydanticize_definitions(
                 obj,
                 core_schema,
                 definition_map=definition_map,
-                decode_complex_values=decode_complex_values,
             )
 
     if "schema" in core_schema:
@@ -306,7 +308,6 @@ def pydanticize_data(
             obj,
             core_schema,
             definition_map=definition_map,
-            decode_complex_values=decode_complex_values,
         )
 
     # already pydanticised
